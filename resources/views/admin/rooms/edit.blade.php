@@ -20,21 +20,36 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Building</label>
-                <input type="text" name="building" value="{{ old('building', $room->building) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <select name="building" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="">Select Building</option>
+                    <option value="Aclc Main" {{ old('building', $room->building) == 'Aclc Main' ? 'selected' : '' }}>Aclc Main</option>
+                    <option value="Aclc SHS" {{ old('building', $room->building) == 'Aclc SHS' ? 'selected' : '' }}>Aclc SHS</option>
+                </select>
+                @error('building')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Floor</label>
-                <input type="text" name="floor" value="{{ old('floor', $room->floor) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <select name="floor" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="">Select Floor</option>
+                    <option value="1st_floor" {{ old('floor', $room->floor) == '1st_floor' ? 'selected' : '' }}>1st Floor</option>
+                    <option value="2nd_floor" {{ old('floor', $room->floor) == '2nd_floor' ? 'selected' : '' }}>2nd Floor</option>
+                    <option value="3rd_floor" {{ old('floor', $room->floor) == '3rd_floor' ? 'selected' : '' }}>3rd Floor</option>
+                    <option value="4th_floor" {{ old('floor', $room->floor) == '4th_floor' ? 'selected' : '' }}>4th Floor</option>
+                </select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Type</label>
-                <select name="type" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                    <option value="lecture" {{ old('type', $room->type) == 'lecture' ? 'selected' : '' }}>Lecture</option>
-                    <option value="laboratory" {{ old('type', $room->type) == 'laboratory' ? 'selected' : '' }}>Laboratory</option>
-                    <option value="computer_lab" {{ old('type', $room->type) == 'computer_lab' ? 'selected' : '' }}>Computer Lab</option>
-                    <option value="science_lab" {{ old('type', $room->type) == 'science_lab' ? 'selected' : '' }}>Science Lab</option>
-                    <option value="workshop" {{ old('type', $room->type) == 'workshop' ? 'selected' : '' }}>Workshop</option>
-                    <option value="other" {{ old('type', $room->type) == 'other' ? 'selected' : '' }}>Other</option>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Room Type</label>
+                <select name="room_type" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="lecture" {{ old('room_type', $room->room_type) == 'lecture' ? 'selected' : '' }}>Lecture</option>
+                    <option value="computer_lab" {{ old('room_type', $room->room_type) == 'computer_lab' ? 'selected' : '' }}>Computer Lab</option>
+                    <option value="chemistry_lab" {{ old('room_type', $room->room_type) == 'chemistry_lab' ? 'selected' : '' }}>Chemistry Lab</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                <select name="status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="available" {{ old('status', $room->status) == 'available' ? 'selected' : '' }}>Available</option>
+                    <option value="unavailable" {{ old('status', $room->status) == 'unavailable' ? 'selected' : '' }}>Unavailable</option>
                 </select>
             </div>
             <div class="md:col-span-2">
@@ -49,7 +64,5 @@
     </form>
 </div>
 @endsection
-
-
 
 

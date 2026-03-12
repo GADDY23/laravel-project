@@ -14,22 +14,28 @@
         <div>
             <h3 class="text-lg font-semibold mb-4">Term Information</h3>
             <dl class="space-y-2">
+                <dt class="font-medium">Term Code:</dt>
+                <dd>{{ $term->term_code }}</dd>
                 <dt class="font-medium">Academic Year:</dt>
                 <dd>{{ $term->academic_year }}</dd>
                 <dt class="font-medium">Semester:</dt>
                 <dd>{{ $term->semester }}</dd>
-                <dt class="font-medium">Start Date:</dt>
-                <dd>{{ $term->start_date->format('F d, Y') }}</dd>
-                <dt class="font-medium">End Date:</dt>
-                <dd>{{ $term->end_date->format('F d, Y') }}</dd>
                 <dt class="font-medium">Status:</dt>
-                <dd><span class="px-2 py-1 text-xs rounded {{ $term->is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">{{ $term->is_active ? 'Active' : 'Inactive' }}</span></dd>
+                <dd class="flex items-center gap-3">
+                    <span class="px-2 py-1 text-xs rounded {{ $term->status == 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">{{ ucfirst($term->status) }}</span>
+                    <form action="{{ route('admin.terms.update-status', $term) }}" method="POST">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="status" value="{{ $term->status === 'active' ? 'inactive' : 'active' }}">
+                        <button type="submit" class="text-blue-600 hover:text-blue-800 text-sm">
+                            Set {{ $term->status === 'active' ? 'Inactive' : 'Active' }}
+                        </button>
+                    </form>
+                </dd>
             </dl>
         </div>
     </div>
 </div>
 @endsection
-
-
 
 

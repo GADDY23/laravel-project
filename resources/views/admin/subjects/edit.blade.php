@@ -19,30 +19,28 @@
                 <input type="text" name="code" value="{{ old('code', $subject->code) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Year Level</label>
-                <input type="text" name="year_level" value="{{ old('year_level', $subject->year_level) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Lec Unit</label>
+                <input type="number" step="1" name="lec_unit" value="{{ old('lec_unit', $subject->lec_unit ?? 0) }}" required min="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                @error('lec_unit')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Semester</label>
-                <input type="text" name="semester" value="{{ old('semester', $subject->semester) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Course/Strand</label>
-                <input type="text" name="course_strand" value="{{ old('course_strand', $subject->course_strand) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Hours</label>
-                <input type="number" name="hours" value="{{ old('hours', $subject->hours) }}" required min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Lab Unit</label>
+                <input type="number" step="1" name="lab_unit" value="{{ old('lab_unit', $subject->lab_unit ?? 0) }}" required min="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                @error('lab_unit')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Required Room Type</label>
                 <select name="required_room_type" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                    <option value="any" {{ old('required_room_type', $subject->required_room_type) == 'any' ? 'selected' : '' }}>Any</option>
                     <option value="lecture" {{ old('required_room_type', $subject->required_room_type) == 'lecture' ? 'selected' : '' }}>Lecture</option>
-                    <option value="laboratory" {{ old('required_room_type', $subject->required_room_type) == 'laboratory' ? 'selected' : '' }}>Laboratory</option>
                     <option value="computer_lab" {{ old('required_room_type', $subject->required_room_type) == 'computer_lab' ? 'selected' : '' }}>Computer Lab</option>
-                    <option value="science_lab" {{ old('required_room_type', $subject->required_room_type) == 'science_lab' ? 'selected' : '' }}>Science Lab</option>
-                    <option value="workshop" {{ old('required_room_type', $subject->required_room_type) == 'workshop' ? 'selected' : '' }}>Workshop</option>
+                    <option value="chemistry_lab" {{ old('required_room_type', $subject->required_room_type) == 'chemistry_lab' ? 'selected' : '' }}>Chemistry Lab</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                <select name="status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="active" {{ old('status', $subject->status) == 'active' ? 'selected' : '' }}>Active</option>
+                    <option value="inactive" {{ old('status', $subject->status) == 'inactive' ? 'selected' : '' }}>Inactive</option>
                 </select>
             </div>
             <div class="md:col-span-2">
@@ -57,7 +55,3 @@
     </form>
 </div>
 @endsection
-
-
-
-

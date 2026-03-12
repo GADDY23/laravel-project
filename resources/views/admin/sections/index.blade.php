@@ -18,8 +18,10 @@
             <thead class="bg-gray-50 dark:bg-gray-900">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Course/Strand</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Program</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Year Level</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Term</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Capacity</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Adviser</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -30,7 +32,13 @@
                 <tr>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $section->name }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $section->course_strand }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $section->year_level }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ ucfirst(str_replace('_', ' ', $section->year_level)) }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $section->term?->term_code ?? 'N/A' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <span class="px-2 py-1 text-xs rounded {{ $section->status == 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">
+                            {{ ucfirst($section->status) }}
+                        </span>
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $section->capacity }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $section->adviser->name ?? 'N/A' }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -45,7 +53,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">No sections found</td>
+                    <td colspan="8" class="px-6 py-4 text-center text-gray-500">No sections found</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -54,7 +62,6 @@
     <div class="p-4">{{ $sections->links() }}</div>
 </div>
 @endsection
-
 
 
 

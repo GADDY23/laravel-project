@@ -16,10 +16,14 @@
             <dl class="space-y-2">
                 <dt class="font-medium">Name:</dt>
                 <dd>{{ $section->name }}</dd>
-                <dt class="font-medium">Course/Strand:</dt>
+                <dt class="font-medium">Program:</dt>
                 <dd>{{ $section->course_strand }}</dd>
                 <dt class="font-medium">Year Level:</dt>
-                <dd>{{ $section->year_level }}</dd>
+                <dd>{{ ucfirst(str_replace('_', ' ', $section->year_level)) }}</dd>
+                <dt class="font-medium">Term:</dt>
+                <dd>{{ $section->term?->term_code ?? 'N/A' }}</dd>
+                <dt class="font-medium">Status:</dt>
+                <dd>{{ ucfirst($section->status) }}</dd>
                 <dt class="font-medium">Capacity:</dt>
                 <dd>{{ $section->capacity }}</dd>
                 <dt class="font-medium">Adviser:</dt>
@@ -29,7 +33,6 @@
     </div>
 </div>
 @endsection
-
 
 
 

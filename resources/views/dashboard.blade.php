@@ -60,38 +60,132 @@
             </div>
         </div>
 
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
-            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Recent Schedules</h3>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 overflow-x-auto">
+            <div class="mb-4 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Generated Weekly Timetable</h3>
+                @if(!empty($activeTerm))
+                    <span class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                        {{ $activeTerm->term_code }} - {{ $activeTerm->academic_year }} - {{ $activeTerm->semester }}
+                    </span>
+                @endif
             </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-900">
+
+            @php
+                $timeSlots = [];
+                for ($hour = 7; $hour < 19; $hour++) {
+                    $timeSlots[] = sprintf('%02d:00', $hour) . ' - ' . sprintf('%02d:30', $hour);
+                    $timeSlots[] = sprintf('%02d:30', $hour) . ' - ' . sprintf('%02d:00', $hour + 1);
+                }
+                $timeSlots[] = '19:00 - 19:30';
+
+                $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                $dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+                $dashboardTimeToMinutes = function ($time) {
+                    $parts = explode(':', $time);
+                    return ((int) $parts[0] * 60) + (int) $parts[1];
+                };
+
+                $schedulePositions = [];
+                foreach (($timetableSchedules ?? collect()) as $schedule) {
+                    $day = strtolower($schedule->day);
+                    $scheduleStart = \Carbon\Carbon::parse($schedule->time_start)->format('H:i');
+                    $scheduleEnd = \Carbon\Carbon::parse($schedule->time_end)->format('H:i');
+
+                    $startMin = $dashboardTimeToMinutes($scheduleStart);
+                    $endMin = $dashboardTimeToMinutes($scheduleEnd);
+
+                    $startSlotIndex = null;
+                    foreach ($timeSlots as $idx => $slot) {
+                        $slotParts = explode(' - ', $slot);
+                        if ($slotParts[0] === $scheduleStart) {
+                            $startSlotIndex = $idx;
+                            break;
+                        }
+                    }
+
+                    if ($startSlotIndex !== null) {
+                        $slotCount = ($endMin - $startMin) / 30;
+                        $schedulePositions[] = [
+                            'schedule' => $schedule,
+                            'dayIndex' => array_search($day, $days),
+                            'startSlotIndex' => $startSlotIndex,
+                            'slotCount' => $slotCount,
+                        ];
+                    }
+                }
+            @endphp
+
+            @if(($timetableSchedules ?? collect())->isEmpty())
+                <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">No official schedules generated yet. Publish a week timetable first.</p>
+            @endif
+
+            <table class="min-w-full border-collapse">
+                <thead>
+                    <tr>
+                        <th class="bg-green-600 text-white font-bold px-4 py-3 text-center border-2 border-green-700">Time</th>
+                        @foreach($dayNames as $dayName)
+                            <th class="bg-green-600 text-white font-bold px-4 py-3 text-center border-2 border-green-700">{{ $dayName }}</th>
+                        @endforeach
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($timeSlots as $index => $slot)
+                        @php
+                            $slotParts = explode(' - ', $slot);
+                            $slotStart = $slotParts[0];
+                        @endphp
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Teacher</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subject</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Section</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Day</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Time</th>
+                            <td class="bg-gray-100 dark:bg-gray-900 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 font-medium border border-gray-300 dark:border-gray-600 text-right w-32">
+                                {{ $slot }}
+                            </td>
+                            @foreach($days as $dayIndex => $day)
+                                @php
+                                    $hasSchedule = false;
+                                    $scheduleInCell = null;
+
+                                    foreach ($schedulePositions as $pos) {
+                                        if ($pos['dayIndex'] === $dayIndex && $pos['startSlotIndex'] === $index) {
+                                            $hasSchedule = true;
+                                            $scheduleInCell = $pos;
+                                            break;
+                                        }
+                                    }
+
+                                    $isCovered = false;
+                                    if (!$hasSchedule) {
+                                        foreach ($schedulePositions as $pos) {
+                                            if ($pos['dayIndex'] === $dayIndex && $index > $pos['startSlotIndex'] && $index < $pos['startSlotIndex'] + $pos['slotCount']) {
+                                                $isCovered = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                @endphp
+                                <td class="relative border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 p-0" style="height: 60px;">
+                                    @if($hasSchedule && $scheduleInCell)
+                                        <div class="absolute inset-0 m-0.5 bg-blue-200 dark:bg-blue-900/40 rounded border border-blue-400 dark:border-blue-600 overflow-hidden" style="height: calc({{ $scheduleInCell['slotCount'] }} * 60px - 4px); z-index: 10;">
+                                            <div class="p-1.5 text-[10px] leading-tight h-full flex flex-col justify-center">
+                                                <div class="font-semibold text-gray-900 dark:text-white">{{ $scheduleInCell['schedule']->subject->name }}</div>
+                                                <div class="text-gray-700 dark:text-gray-300">{{ $scheduleInCell['schedule']->section->name }}</div>
+                                                <div class="text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->teacher->name }}</div>
+                                                <div class="text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name }}</div>
+                                                <div class="text-gray-600 dark:text-gray-400">{{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_start)->format('H:i') }} - {{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_end)->format('H:i') }}</div>
+                                            </div>
+                                        </div>
+                                    @elseif(!$isCovered)
+                                        <div class="absolute inset-0"></div>
+                                    @endif
+                                </td>
+                            @endforeach
                         </tr>
-                    </thead>
-                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        @forelse($recentSchedules ?? [] as $schedule)
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $schedule->teacher->name }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $schedule->subject->name }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $schedule->section->name }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ ucfirst($schedule->day) }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $schedule->time_start }} - {{ $schedule->time_end }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">No schedules found</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">No official schedules generated yet.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     @endsection
 @else

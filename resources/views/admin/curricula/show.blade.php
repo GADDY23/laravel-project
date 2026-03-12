@@ -15,46 +15,64 @@
             <h3 class="text-lg font-semibold mb-4">Curriculum Information</h3>
             <dl class="space-y-2">
                 <dt class="font-medium">Code:</dt>
-                <dd>{{ $curriculum->code }}</dd>
-                <dt class="font-medium">Name:</dt>
-                <dd>{{ $curriculum->name }}</dd>
-                <dt class="font-medium">Strand/Program:</dt>
-                <dd>{{ $curriculum->strand_program }}</dd>
-                <dt class="font-medium">Year Level:</dt>
-                <dd>{{ $curriculum->year_level }}</dd>
-                <dt class="font-medium">Semester:</dt>
-                <dd>{{ $curriculum->semester }}</dd>
+                <dd>{{ $curriculum->curriculum_code }}</dd>
+                <dt class="font-medium">School Year Start:</dt>
+                <dd>{{ $curriculum->school_year_start ?? '-' }}</dd>
+                <dt class="font-medium">Program Type:</dt>
+                <dd>{{ strtoupper($curriculum->course_type ?? '-') }}</dd>
+                <dt class="font-medium">Curriculum Type:</dt>
+                <dd>{{ ucfirst($curriculum->curriculum_type ?? '-') }}</dd>
+                <dt class="font-medium">Program:</dt>
+                <dd>{{ $curriculum->course_strand }}</dd>
             </dl>
         </div>
     </div>
+
     @if($curriculum->subjects->count() > 0)
-    <div class="mt-8">
-        <h3 class="text-lg font-semibold mb-4">Subjects</h3>
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hours</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    @foreach($curriculum->subjects as $subject)
-                    <tr>
-                        <td class="px-6 py-4">{{ $subject->code ?? 'N/A' }}</td>
-                        <td class="px-6 py-4">{{ $subject->name }}</td>
-                        <td class="px-6 py-4">{{ $subject->hours }}</td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
+        @php
+            $yearLabels = [
+                '1st_year' => '1st Year',
+                '2nd_year' => '2nd Year',
+                '3rd_year' => '3rd Year',
+                '4th_year' => '4th Year',
+            ];
+            $periodWord = ($curriculum->curriculum_type ?? 'semestral') === 'trimestral' ? 'Tri' : 'Sem';
+        @endphp
+        <div class="mt-8 space-y-6">
+            @foreach($groupedRows as $groupKey => $subjects)
+                @php
+                    [$yearKey, $periodNumber] = explode('|', $groupKey);
+                    $yearTitle = $yearLabels[$yearKey] ?? ucfirst(str_replace('_', ' ', $yearKey));
+                    $periodTitle = $periodNumber . ' ' . $periodWord;
+                @endphp
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <h3 class="text-lg font-semibold mb-3">{{ $yearTitle }} {{ $periodTitle }}</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prerequisite</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                @foreach($subjects as $subject)
+                                    <tr>
+                                        <td class="px-6 py-4">{{ $subject->code ?? 'N/A' }}</td>
+                                        <td class="px-6 py-4">{{ $subject->name }}</td>
+                                        <td class="px-6 py-4">{{ $subject->description ?? '-' }}</td>
+                                        <td class="px-6 py-4">{{ $subject->pivot->prerequisite ?? '-' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endforeach
         </div>
-    </div>
     @endif
 </div>
 @endsection
-
-
-
 

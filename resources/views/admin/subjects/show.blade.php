@@ -18,16 +18,14 @@
                 <dd>{{ $subject->name }}</dd>
                 <dt class="font-medium">Code:</dt>
                 <dd>{{ $subject->code ?? 'N/A' }}</dd>
-                <dt class="font-medium">Year Level:</dt>
-                <dd>{{ $subject->year_level }}</dd>
-                <dt class="font-medium">Semester:</dt>
-                <dd>{{ $subject->semester }}</dd>
-                <dt class="font-medium">Course/Strand:</dt>
-                <dd>{{ $subject->course_strand }}</dd>
-                <dt class="font-medium">Hours:</dt>
-                <dd>{{ $subject->hours }}</dd>
+                <dt class="font-medium">Lec Unit:</dt>
+                <dd>{{ $subject->lec_unit ?? 0 }}</dd>
+                <dt class="font-medium">Lab Unit:</dt>
+                <dd>{{ $subject->lab_unit ?? 0 }}</dd>
                 <dt class="font-medium">Required Room Type:</dt>
                 <dd>{{ ucfirst(str_replace('_', ' ', $subject->required_room_type)) }}</dd>
+                <dt class="font-medium">Status:</dt>
+                <dd>{{ ucfirst($subject->status) }}</dd>
                 <dt class="font-medium">Description:</dt>
                 <dd>{{ $subject->description ?? 'N/A' }}</dd>
             </dl>
@@ -35,7 +33,4 @@
     </div>
 </div>
 @endsection
-
-
-
 

@@ -16,10 +16,12 @@ return new class extends Migration
             $table->string('name');
             $table->integer('capacity');
             $table->string('building')->nullable();
-            $table->string('floor')->nullable();
-            $table->enum('type', ['lecture', 'laboratory', 'computer_lab', 'science_lab', 'workshop', 'other'])->default('lecture');
+            $table->enum('floor', ['1st_floor', '2nd_floor', '3rd_floor', '4th_floor'])->nullable();
+            $table->enum('room_type', ['lecture', 'computer_lab', 'chemistry_lab'])->default('lecture');
+            $table->enum('status', ['available', 'unavailable'])->default('available');
             $table->text('description')->nullable();
             $table->timestamps();
+
         });
     }
 

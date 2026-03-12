@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\CourseStrand;
 use App\Models\User;
 use App\Models\Subject;
 use App\Models\Section;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
 
 class UserController extends Controller
@@ -37,9 +40,13 @@ class UserController extends Controller
 
     public function create()
     {
-        $subjects = Subject::all();
-        $sections = Section::all();
-        return view('admin.users.create', compact('subjects', 'sections'));
+        $subjects = Subject::active()->get();
+        $sections = Section::active()->get();
+        $courseStrands = Schema::hasTable('course_strands')
+            ? CourseStrand::orderBy('type')->orderBy('name')->get()->groupBy('type')
+            : collect();
+
+        return view('admin.users.create', compact('subjects', 'sections', 'courseStrands'));
     }
 
     public function store(Request $request)
@@ -58,14 +65,25 @@ class UserController extends Controller
             $rules['department'] = 'nullable|string|max:255';
             $rules['expertise'] = 'nullable|string';
             $rules['subjects'] = 'nullable|array';
-            $rules['subjects.*'] = 'exists:subjects,id';
+            $rules['subjects.*'] = 'exists:subjects,id,status,active';
         }
 
         if ($request->role === 'student') {
+            $courseType = $request->input('course_type');
             $rules['student_id'] = 'required|string|max:255|unique:users';
+            $rules['course_type'] = 'required|in:shs,college';
             $rules['course_strand'] = 'required|string|max:255';
-            $rules['year_level'] = 'required|string|max:255';
+            $rules['year_level'] = ['required', Rule::in(CourseStrand::yearLevelsForType($courseType))];
             $rules['section'] = 'nullable|string|max:255';
+
+            if (Schema::hasTable('course_strands')) {
+                $rules['course_strand'] = [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::exists('course_strands', 'name')->where(fn($query) => $query->where('type', $courseType)),
+                ];
+            }
         }
 
         $validated = $request->validate($rules);
@@ -110,10 +128,13 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
-        $subjects = Subject::all();
-        $sections = Section::all();
+        $subjects = Subject::active()->get();
+        $sections = Section::active()->get();
+        $courseStrands = Schema::hasTable('course_strands')
+            ? CourseStrand::orderBy('type')->orderBy('name')->get()->groupBy('type')
+            : collect();
         $user->load('subjects');
-        return view('admin.users.edit', compact('user', 'subjects', 'sections'));
+        return view('admin.users.edit', compact('user', 'subjects', 'sections', 'courseStrands'));
     }
 
     public function update(Request $request, User $user)
@@ -135,14 +156,25 @@ class UserController extends Controller
             $rules['department'] = 'nullable|string|max:255';
             $rules['expertise'] = 'nullable|string';
             $rules['subjects'] = 'nullable|array';
-            $rules['subjects.*'] = 'exists:subjects,id';
+            $rules['subjects.*'] = 'exists:subjects,id,status,active';
         }
 
         if ($request->role === 'student') {
+            $courseType = $request->input('course_type');
             $rules['student_id'] = 'required|string|max:255|unique:users,student_id,' . $user->id;
+            $rules['course_type'] = 'required|in:shs,college';
             $rules['course_strand'] = 'required|string|max:255';
-            $rules['year_level'] = 'required|string|max:255';
+            $rules['year_level'] = ['required', Rule::in(CourseStrand::yearLevelsForType($courseType))];
             $rules['section'] = 'nullable|string|max:255';
+
+            if (Schema::hasTable('course_strands')) {
+                $rules['course_strand'] = [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::exists('course_strands', 'name')->where(fn($query) => $query->where('type', $courseType)),
+                ];
+            }
         }
 
         $validated = $request->validate($rules);

@@ -17,11 +17,15 @@ class Schedule extends Model
         'day',
         'time_start',
         'time_end',
+        'is_published',
+        'published_at',
     ];
 
     protected $casts = [
         'time_start' => 'datetime:H:i',
         'time_end' => 'datetime:H:i',
+        'is_published' => 'boolean',
+        'published_at' => 'datetime',
     ];
 
     public function teacher(): BelongsTo

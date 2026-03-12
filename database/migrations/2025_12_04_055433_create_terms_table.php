@@ -13,11 +13,11 @@ return new class extends Migration
     {
         Schema::create('terms', function (Blueprint $table) {
             $table->id();
+            $table->string('term_code')->unique();
             $table->string('academic_year');
             $table->string('semester');
-            $table->date('start_date');
-            $table->date('end_date');
-            $table->boolean('is_active')->default(false);
+            $table->enum('status', ['active', 'inactive'])->default('inactive');
+            $table->boolean('is_enabled')->default(true);
             $table->timestamps();
         });
     }

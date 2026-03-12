@@ -7,9 +7,9 @@ use App\Http\Controllers\Admin\RoomController;
 use App\Http\Controllers\Admin\SectionController;
 use App\Http\Controllers\Admin\SubjectController;
 use App\Http\Controllers\Admin\CurriculumController;
+use App\Http\Controllers\Admin\CourseStrandController;
 use App\Http\Controllers\Admin\TermController;
 use App\Http\Controllers\Admin\ScheduleController;
-use App\Http\Controllers\Admin\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -39,26 +39,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
         
         // Curricula
         Route::resource('curricula', CurriculumController::class);
+
+        // Course/Strands
+        Route::resource('course-strands', CourseStrandController::class);
         
         // Terms
+        Route::patch('terms/{term}/status', [TermController::class, 'updateStatus'])->name('terms.update-status');
         Route::resource('terms', TermController::class);
         
         // Schedules - Define specific routes BEFORE resource route to avoid conflicts
+        Route::get('schedules/configure', [ScheduleController::class, 'configure'])->name('schedules.configure');
         Route::get('schedules/timetable', [ScheduleController::class, 'timetable'])->name('schedules.timetable');
         Route::post('schedules/store-from-timetable', [ScheduleController::class, 'storeFromTimetable'])->name('schedules.store-from-timetable');
         Route::post('schedules/check-conflicts', [ScheduleController::class, 'checkConflictsAjax'])->name('schedules.check-conflicts');
+        Route::post('schedules/publish-week', [ScheduleController::class, 'publishWeek'])->name('schedules.publish-week');
         Route::resource('schedules', ScheduleController::class);
         
-        // Notifications
-        Route::resource('notifications', NotificationController::class)->except(['edit', 'update', 'show']);
     });
-    
-    // Notification routes for all users
-    Route::post('/notifications/{notification}/mark-read', function ($notification) {
-        $notification = \App\Models\Notification::findOrFail($notification);
-        $notification->update(['is_read' => true]);
-        return back();
-    })->name('notifications.mark-read');
 });
 
 require __DIR__.'/auth.php';

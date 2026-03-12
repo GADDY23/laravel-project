@@ -15,8 +15,11 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('course_strand');
-            $table->string('year_level');
+            $table->enum('year_level', ['grade_11', 'grade_12', '1st_year', '2nd_year', '3rd_year', '4th_year']);
             $table->integer('capacity');
+            $table->unsignedBigInteger('term_id')->nullable();
+            $table->unsignedBigInteger('curriculum_id')->nullable();
+            $table->enum('status', ['active', 'inactive'])->default('active');
             $table->foreignId('adviser_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });

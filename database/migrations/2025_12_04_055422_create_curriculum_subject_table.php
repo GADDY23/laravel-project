@@ -15,6 +15,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('curriculum_id')->constrained('curricula')->cascadeOnDelete();
             $table->foreignId('subject_id')->constrained('subjects')->cascadeOnDelete();
+            $table->enum('year_level', ['1st_year', '2nd_year', '3rd_year', '4th_year'])->nullable();
+            $table->unsignedTinyInteger('period_number')->nullable();
+            $table->string('period_label')->nullable();
+            $table->string('prerequisite')->nullable();
             $table->timestamps();
         });
     }

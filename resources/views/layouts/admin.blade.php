@@ -8,6 +8,24 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        .text-horizontal {
+            writing-mode: horizontal-tb;
+            text-orientation: mixed;
+        }
+
+        .text-horizontal dl.space-y-2 {
+            display: grid;
+            grid-template-columns: minmax(140px, 220px) 1fr;
+            column-gap: 1rem;
+            row-gap: 0.5rem;
+        }
+
+        .text-horizontal dl.space-y-2 dt,
+        .text-horizontal dl.space-y-2 dd {
+            margin: 0;
+        }
+    </style>
 </head>
 <body class="font-sans antialiased bg-gray-100 dark:bg-gray-900">
     <div class="min-h-screen flex">
@@ -54,6 +72,12 @@
                     </svg>
                     Curricula
                 </a>
+                <a href="{{ route('admin.course-strands.index') }}" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 {{ request()->routeIs('admin.course-strands.*') ? 'bg-gray-700' : '' }}">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M4 12h16M4 17h16" />
+                    </svg>
+                    Programs
+                </a>
                 <a href="{{ route('admin.terms.index') }}" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 {{ request()->routeIs('admin.terms.*') ? 'bg-gray-700' : '' }}">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -65,12 +89,6 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                     Schedules
-                </a>
-                <a href="{{ route('admin.notifications.index') }}" class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 {{ request()->routeIs('admin.notifications.*') ? 'bg-gray-700' : '' }}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                    </svg>
-                    Notifications
                 </a>
             </nav>
         </aside>
@@ -98,7 +116,7 @@
             </header>
 
             <!-- Page Content -->
-            <main class="p-6">
+            <main class="p-6 text-horizontal">
                 @if(session('success'))
                     <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
                         {{ session('success') }}
@@ -121,4 +139,3 @@
     </div>
 </body>
 </html>
-

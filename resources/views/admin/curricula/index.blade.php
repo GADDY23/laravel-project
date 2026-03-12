@@ -18,8 +18,7 @@
             <thead class="bg-gray-50 dark:bg-gray-900">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Strand/Program</th>
+                
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subjects</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
@@ -27,9 +26,8 @@
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                 @forelse($curricula as $curriculum)
                 <tr>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $curriculum->code }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $curriculum->name }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $curriculum->strand_program }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $curriculum->curriculum_code }}</td>
+                    
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $curriculum->subjects->count() }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <a href="{{ route('admin.curricula.show', $curriculum) }}" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
@@ -43,7 +41,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">No curricula found</td>
+                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">No curricula found</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -52,7 +50,3 @@
     <div class="p-4">{{ $curricula->links() }}</div>
 </div>
 @endsection
-
-
-
-

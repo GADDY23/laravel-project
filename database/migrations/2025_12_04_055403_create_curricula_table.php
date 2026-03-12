@@ -13,13 +13,17 @@ return new class extends Migration
     {
         Schema::create('curricula', function (Blueprint $table) {
             $table->id();
-            $table->string('code')->unique();
-            $table->string('name');
-            $table->string('strand_program');
-            $table->string('year_level');
-            $table->string('semester');
+            $table->string('curriculum_code')->unique();
+            $table->integer('school_year_start')->nullable();
+            $table->enum('course_type', ['shs', 'college'])->default('college');
+            $table->enum('curriculum_type', ['semestral', 'trimestral'])->default('semestral');
+            $table->string('course_strand');
+            $table->enum('year_level', ['grade_11', 'grade_12', '1st_year', '2nd_year', '3rd_year', '4th_year']);
+            $table->unsignedBigInteger('term_id')->nullable();
             $table->timestamps();
         });
+
+        
     }
 
     /**

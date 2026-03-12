@@ -15,19 +15,59 @@
                 @error('name')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Course/Strand</label>
-                <input type="text" name="course_strand" value="{{ old('course_strand') }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Program Type</label>
+                <select name="course_type" id="course_type" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="">Select Type</option>
+                    <option value="shs" {{ old('course_type') == 'shs' ? 'selected' : '' }}>SHS</option>
+                    <option value="college" {{ old('course_type') == 'college' ? 'selected' : '' }}>College</option>
+                </select>
+                @error('course_type')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Program</label>
+                <select name="course_strand" id="course_strand" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></select>
                 @error('course_strand')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Year Level</label>
-                <input type="text" name="year_level" value="{{ old('year_level') }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <select name="year_level" id="year_level" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></select>
                 @error('year_level')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Capacity</label>
                 <input type="number" name="capacity" value="{{ old('capacity') }}" required min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
                 @error('capacity')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Term</label>
+                <select name="term_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="">Select Term</option>
+                    @foreach($terms as $term)
+                        <option value="{{ $term->id }}" {{ old('term_id') == $term->id ? 'selected' : '' }}>
+                            {{ $term->term_code }} - {{ $term->academic_year }} - {{ $term->semester }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('term_id')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Curriculum</label>
+                <select name="curriculum_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="">Select Curriculum</option>
+                    @foreach($curricula as $curriculum)
+                        <option value="{{ $curriculum->id }}" {{ old('curriculum_id') == $curriculum->id ? 'selected' : '' }}>
+                            {{ $curriculum->curriculum_code }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('curriculum_id')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                <select name="status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="active" {{ old('status', 'active') == 'active' ? 'selected' : '' }}>Active</option>
+                    <option value="inactive" {{ old('status') == 'inactive' ? 'selected' : '' }}>Inactive</option>
+                </select>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Adviser</label>
@@ -45,8 +85,66 @@
         </div>
     </form>
 </div>
+
+<script>
+const strandsByType = @json($courseStrands);
+const courseType = document.getElementById('course_type');
+const courseStrand = document.getElementById('course_strand');
+const yearLevel = document.getElementById('year_level');
+const previousStrand = @json(old('course_strand'));
+const previousYearLevel = @json(old('year_level'));
+
+const yearLevelsByType = {
+    shs: [
+        { value: 'grade_11', label: 'Grade 11' },
+        { value: 'grade_12', label: 'Grade 12' },
+    ],
+    college: [
+        { value: '1st_year', label: '1st Year' },
+        { value: '2nd_year', label: '2nd Year' },
+        { value: '3rd_year', label: '3rd Year' },
+        { value: '4th_year', label: '4th Year' },
+    ],
+};
+
+function renderCourseStrands() {
+    const selectedType = courseType.value;
+    const strands = strandsByType[selectedType] ?? [];
+
+    courseStrand.innerHTML = '<option value="">Select Course/Strand</option>';
+    strands.forEach((strand) => {
+        const option = document.createElement('option');
+        option.value = strand.name;
+        option.textContent = strand.name;
+        if (previousStrand && previousStrand === strand.name) {
+            option.selected = true;
+        }
+        courseStrand.appendChild(option);
+    });
+}
+
+function renderYearLevels() {
+    const selectedType = courseType.value;
+    const levels = yearLevelsByType[selectedType] ?? [];
+
+    yearLevel.innerHTML = '<option value="">Select Year Level</option>';
+    levels.forEach((level) => {
+        const option = document.createElement('option');
+        option.value = level.value;
+        option.textContent = level.label;
+        if (previousYearLevel && previousYearLevel === level.value) {
+            option.selected = true;
+        }
+        yearLevel.appendChild(option);
+    });
+}
+
+courseType.addEventListener('change', () => {
+    renderCourseStrands();
+    renderYearLevels();
+});
+
+renderCourseStrands();
+renderYearLevels();
+</script>
 @endsection
-
-
-
-

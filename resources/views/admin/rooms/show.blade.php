@@ -21,9 +21,11 @@
                 <dt class="font-medium">Building:</dt>
                 <dd>{{ $room->building ?? 'N/A' }}</dd>
                 <dt class="font-medium">Floor:</dt>
-                <dd>{{ $room->floor ?? 'N/A' }}</dd>
+                <dd>{{ $room->floor ? str_replace('_', ' ', $room->floor) : 'N/A' }}</dd>
                 <dt class="font-medium">Type:</dt>
-                <dd>{{ ucfirst(str_replace('_', ' ', $room->type)) }}</dd>
+                <dd>{{ ucfirst(str_replace('_', ' ', $room->room_type)) }}</dd>
+                <dt class="font-medium">Status:</dt>
+                <dd>{{ ucfirst($room->status) }}</dd>
                 <dt class="font-medium">Description:</dt>
                 <dd>{{ $room->description ?? 'N/A' }}</dd>
             </dl>
@@ -59,7 +61,6 @@
     @endif
 </div>
 @endsection
-
 
 
 

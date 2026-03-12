@@ -72,11 +72,6 @@ class User extends Authenticatable
         return $this->belongsToMany(Subject::class, 'teacher_subject', 'teacher_id', 'subject_id');
     }
 
-    public function notifications()
-    {
-        return $this->hasMany(Notification::class);
-    }
-
     // Helper methods
     public function isAdmin()
     {

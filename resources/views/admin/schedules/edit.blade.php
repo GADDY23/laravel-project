@@ -12,7 +12,8 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Teacher</label>
-                <select name="teacher_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <select name="teacher_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="">Unassigned</option>
                     @foreach($teachers as $teacher)
                     <option value="{{ $teacher->id }}" {{ old('teacher_id', $schedule->teacher_id) == $teacher->id ? 'selected' : '' }}>{{ $teacher->name }}</option>
                     @endforeach
@@ -49,7 +50,7 @@
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Term</label>
                 <select name="term_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
                     @foreach($terms as $term)
-                    <option value="{{ $term->id }}" {{ old('term_id', $schedule->term_id) == $term->id ? 'selected' : '' }}>{{ $term->academic_year }} - {{ $term->semester }}</option>
+                    <option value="{{ $term->id }}" {{ old('term_id', $schedule->term_id) == $term->id ? 'selected' : '' }}>{{ $term->term_code }} - {{ $term->academic_year }} - {{ $term->semester }}</option>
                     @endforeach
                 </select>
             </div>
@@ -81,7 +82,5 @@
     </form>
 </div>
 @endsection
-
-
 
 

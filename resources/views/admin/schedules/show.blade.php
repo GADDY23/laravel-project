@@ -27,13 +27,12 @@
                 <dt class="font-medium">Time:</dt>
                 <dd>{{ $schedule->time_start }} - {{ $schedule->time_end }}</dd>
                 <dt class="font-medium">Term:</dt>
-                <dd>{{ $schedule->term->academic_year }} - {{ $schedule->term->semester }}</dd>
+                <dd>{{ $schedule->term->term_code }} - {{ $schedule->term->academic_year }} - {{ $schedule->term->semester }}</dd>
             </dl>
         </div>
     </div>
 </div>
 @endsection
-
 
 
 

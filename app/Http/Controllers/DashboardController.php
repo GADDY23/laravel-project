@@ -8,9 +8,9 @@ use App\Models\Room;
 use App\Models\Section;
 use App\Models\Subject;
 use App\Models\Term;
-use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
@@ -29,64 +29,101 @@ class DashboardController extends Controller
 
     private function adminDashboard()
     {
+        $activeTerm = Term::active()->first();
+
         $stats = [
             'total_users' => User::count(),
             'total_teachers' => User::where('role', 'teacher')->count(),
             'total_students' => User::where('role', 'student')->count(),
-            'total_rooms' => Room::count(),
-            'total_sections' => Section::count(),
-            'total_subjects' => Subject::count(),
-            'total_schedules' => Schedule::count(),
-            'active_term' => Term::where('is_active', true)->first(),
+            'total_rooms' => Room::available()->count(),
+            'total_sections' => Section::active()->count(),
+            'total_subjects' => Subject::active()->count(),
+            'total_schedules' => Schedule::query()
+                ->whereHas('subject', fn($q) => $q->active())
+                ->whereHas('section', fn($q) => $q->active())
+                ->whereHas('room', fn($q) => $q->available())
+                ->whereHas('term', fn($q) => $q->active())
+                ->count(),
+            'active_term' => $activeTerm,
         ];
 
-        $recentSchedules = Schedule::with(['teacher', 'subject', 'section', 'room'])
-            ->latest()
+        $recentSchedulesQuery = Schedule::with(['teacher', 'subject', 'section', 'room', 'term'])
+            ->whereHas('subject', fn($q) => $q->active())
+            ->whereHas('section', fn($q) => $q->active())
+            ->whereHas('room', fn($q) => $q->available())
+            ->whereHas('term', fn($q) => $q->active());
+
+        if (Schema::hasColumn('schedules', 'is_published')) {
+            $recentSchedulesQuery->where('is_published', true);
+        }
+
+        $recentSchedules = $recentSchedulesQuery->latest()
             ->take(10)
             ->get();
 
-        return view('dashboard', compact('stats', 'recentSchedules'));
+        $timetableSchedulesQuery = Schedule::with(['teacher', 'subject', 'section', 'room', 'term'])
+            ->when($activeTerm, fn($q) => $q->where('term_id', $activeTerm->id))
+            ->whereHas('subject', fn($q) => $q->active())
+            ->whereHas('section', fn($q) => $q->active())
+            ->whereHas('room', fn($q) => $q->available())
+            ->whereHas('term', fn($q) => $q->active());
+
+        if (Schema::hasColumn('schedules', 'is_published')) {
+            $timetableSchedulesQuery->where('is_published', true);
+        }
+
+        $timetableSchedules = $timetableSchedulesQuery->orderBy('day')
+            ->orderBy('time_start')
+            ->get();
+
+        return view('dashboard', compact('stats', 'recentSchedules', 'timetableSchedules', 'activeTerm'));
     }
 
     private function teacherDashboard($user)
     {
-        $activeTerm = Term::where('is_active', true)->first();
+        $activeTerm = Term::active()->first();
         
-        $schedules = Schedule::where('teacher_id', $user->id)
+        $schedulesQuery = Schedule::where('teacher_id', $user->id)
             ->when($activeTerm, fn($q) => $q->where('term_id', $activeTerm->id))
-            ->with(['subject', 'section', 'room', 'term'])
-            ->orderBy('day')
+            ->whereHas('subject', fn($q) => $q->active())
+            ->whereHas('section', fn($q) => $q->active())
+            ->whereHas('room', fn($q) => $q->available())
+            ->whereHas('term', fn($q) => $q->active())
+            ->with(['subject', 'section', 'room', 'term']);
+
+        if (Schema::hasColumn('schedules', 'is_published')) {
+            $schedulesQuery->where('is_published', true);
+        }
+
+        $schedules = $schedulesQuery->orderBy('day')
             ->orderBy('time_start')
             ->get();
 
-        $notifications = Notification::where('user_id', $user->id)
-            ->where('is_read', false)
-            ->orderBy('created_at', 'desc')
-            ->take(10)
-            ->get();
-
-        return view('teacher.dashboard', compact('schedules', 'notifications', 'activeTerm'));
+        return view('teacher.dashboard', compact('schedules', 'activeTerm'));
     }
 
     private function studentDashboard($user)
     {
-        $activeTerm = Term::where('is_active', true)->first();
+        $activeTerm = Term::active()->first();
         
-        $section = Section::where('name', $user->section)->first();
+        $section = Section::active()->where('name', $user->section)->first();
         
-        $schedules = Schedule::where('section_id', $section?->id ?? 0)
+        $schedulesQuery = Schedule::where('section_id', $section?->id ?? 0)
             ->when($activeTerm, fn($q) => $q->where('term_id', $activeTerm->id))
-            ->with(['teacher', 'subject', 'section', 'room', 'term'])
-            ->orderBy('day')
+            ->whereHas('subject', fn($q) => $q->active())
+            ->whereHas('section', fn($q) => $q->active())
+            ->whereHas('room', fn($q) => $q->available())
+            ->whereHas('term', fn($q) => $q->active())
+            ->with(['teacher', 'subject', 'section', 'room', 'term']);
+
+        if (Schema::hasColumn('schedules', 'is_published')) {
+            $schedulesQuery->where('is_published', true);
+        }
+
+        $schedules = $schedulesQuery->orderBy('day')
             ->orderBy('time_start')
             ->get();
 
-        $notifications = Notification::where('user_id', $user->id)
-            ->where('is_read', false)
-            ->orderBy('created_at', 'desc')
-            ->take(10)
-            ->get();
-
-        return view('student.dashboard', compact('schedules', 'notifications', 'activeTerm', 'section'));
+        return view('student.dashboard', compact('schedules', 'activeTerm', 'section'));
     }
 }

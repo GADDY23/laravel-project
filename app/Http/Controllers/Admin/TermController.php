@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Term;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class TermController extends Controller
 {
@@ -19,23 +20,20 @@ class TermController extends Controller
 
     public function create()
     {
-        return view('admin.terms.create');
+        $academicYearOptions = Term::academicYearOptions();
+        $semesterOptions = Term::semesterOptions();
+
+        return view('admin.terms.create', compact('academicYearOptions', 'semesterOptions'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'academic_year' => 'required|string|max:255',
-            'semester' => 'required|string|max:255',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
-            'is_active' => 'boolean',
+            'term_code' => 'required|string|max:255|unique:terms,term_code',
+            'academic_year' => ['required', Rule::in(Term::academicYearOptions())],
+            'semester' => ['required', Rule::in(Term::semesterOptions())],
+            'status' => 'required|in:active,inactive',
         ]);
-
-        // If this term is set as active, deactivate all other terms
-        if ($request->has('is_active') && $request->is_active) {
-            Term::where('is_active', true)->update(['is_active' => false]);
-        }
 
         Term::create($validated);
 
@@ -51,25 +49,20 @@ class TermController extends Controller
 
     public function edit(Term $term)
     {
-        return view('admin.terms.edit', compact('term'));
+        $academicYearOptions = Term::academicYearOptions();
+        $semesterOptions = Term::semesterOptions();
+
+        return view('admin.terms.edit', compact('term', 'academicYearOptions', 'semesterOptions'));
     }
 
     public function update(Request $request, Term $term)
     {
         $validated = $request->validate([
-            'academic_year' => 'required|string|max:255',
-            'semester' => 'required|string|max:255',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
-            'is_active' => 'boolean',
+            'term_code' => 'required|string|max:255|unique:terms,term_code,' . $term->id,
+            'academic_year' => ['required', Rule::in(Term::academicYearOptions())],
+            'semester' => ['required', Rule::in(Term::semesterOptions())],
+            'status' => 'required|in:active,inactive',
         ]);
-
-        // If this term is set as active, deactivate all other terms
-        if ($request->has('is_active') && $request->is_active) {
-            Term::where('id', '!=', $term->id)
-                ->where('is_active', true)
-                ->update(['is_active' => false]);
-        }
 
         $term->update($validated);
 
@@ -83,5 +76,25 @@ class TermController extends Controller
 
         return redirect()->route('admin.terms.index')
             ->with('success', 'Term deleted successfully.');
+    }
+
+    public function updateStatus(Request $request, Term $term)
+    {
+        $validated = $request->validate([
+            'is_enabled' => 'required|boolean',
+        ]);
+
+        $term->update(['is_enabled' => (bool) $validated['is_enabled']]);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Term availability updated successfully.',
+                'status' => $term->status,
+                'is_enabled' => (bool) $term->is_enabled,
+                'term_id' => $term->id,
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Term availability updated successfully.');
     }
 }

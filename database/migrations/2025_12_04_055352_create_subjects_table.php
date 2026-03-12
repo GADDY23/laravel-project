@@ -15,11 +15,12 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('code')->unique()->nullable();
-            $table->string('year_level');
-            $table->string('semester');
+            $table->enum('year_level', ['grade_11', 'grade_12', '1st_year', '2nd_year', '3rd_year', '4th_year']);
             $table->string('course_strand');
-            $table->integer('hours');
-            $table->enum('required_room_type', ['lecture', 'laboratory', 'computer_lab', 'science_lab', 'workshop', 'any'])->default('any');
+            $table->decimal('lec_unit', 4, 2)->default(0);
+            $table->decimal('lab_unit', 4, 2)->default(0);
+            $table->enum('required_room_type', ['lecture', 'computer_lab', 'chemistry_lab'])->default('lecture');
+            $table->enum('status', ['active', 'inactive'])->default('active');
             $table->text('description')->nullable();
             $table->timestamps();
         });

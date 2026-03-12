@@ -11,26 +11,37 @@
         @method('PUT')
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Term Code</label>
+                <input type="text" name="term_code" value="{{ old('term_code', $term->term_code) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+            </div>
+            <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Academic Year</label>
-                <input type="text" name="academic_year" value="{{ old('academic_year', $term->academic_year) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <select name="academic_year" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="">Select Academic Year</option>
+                    @foreach($academicYearOptions as $academicYearOption)
+                        <option value="{{ $academicYearOption }}" {{ old('academic_year', $term->academic_year) === $academicYearOption ? 'selected' : '' }}>
+                            {{ $academicYearOption }}
+                        </option>
+                    @endforeach
+                </select>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Semester</label>
-                <input type="text" name="semester" value="{{ old('semester', $term->semester) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <select name="semester" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="">Select Semester</option>
+                    @foreach($semesterOptions as $semesterOption)
+                        <option value="{{ $semesterOption }}" {{ old('semester', $term->semester) === $semesterOption ? 'selected' : '' }}>
+                            {{ $semesterOption }}
+                        </option>
+                    @endforeach
+                </select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Start Date</label>
-                <input type="date" name="start_date" value="{{ old('start_date', $term->start_date->format('Y-m-d')) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">End Date</label>
-                <input type="date" name="end_date" value="{{ old('end_date', $term->end_date->format('Y-m-d')) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-            </div>
-            <div>
-                <label class="flex items-center">
-                    <input type="checkbox" name="is_active" value="1" {{ old('is_active', $term->is_active) ? 'checked' : '' }} class="rounded border-gray-300">
-                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Set as Active Term</span>
-                </label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                <select name="status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="inactive" {{ old('status', $term->status) == 'inactive' ? 'selected' : '' }}>Inactive</option>
+                    <option value="active" {{ old('status', $term->status) == 'active' ? 'selected' : '' }}>Active</option>
+                </select>
             </div>
         </div>
         <div class="mt-6 flex gap-4">
@@ -40,7 +51,5 @@
     </form>
 </div>
 @endsection
-
-
 
 

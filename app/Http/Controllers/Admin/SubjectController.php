@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Subject;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class SubjectController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Subject::query();
+        $query = Subject::active();
 
         if ($request->has('search') && $request->search) {
             $query->where(function($q) use ($request) {
@@ -31,18 +32,42 @@ class SubjectController extends Controller
 
     public function store(Request $request)
     {
+        $hasLecLabColumns = Schema::hasColumn('subjects', 'lec_unit') && Schema::hasColumn('subjects', 'lab_unit');
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'nullable|string|max:255|unique:subjects',
-            'year_level' => 'required|string|max:255',
-            'semester' => 'required|string|max:255',
-            'course_strand' => 'required|string|max:255',
-            'hours' => 'required|integer|min:1',
-            'required_room_type' => 'required|in:lecture,laboratory,computer_lab,science_lab,workshop,any',
+            'lec_unit' => 'required|integer|min:0|max:99',
+            'lab_unit' => 'required|integer|min:0|max:99',
+            'required_room_type' => 'required|in:lecture,computer_lab,chemistry_lab',
+            'status' => 'required|in:active,inactive',
             'description' => 'nullable|string',
         ]);
 
-        Subject::create($validated);
+        $payload = [
+            'name' => $validated['name'],
+            'code' => $validated['code'] ?? null,
+            'required_room_type' => $validated['required_room_type'],
+            'status' => $validated['status'],
+            'description' => $validated['description'] ?? null,
+            'course_strand' => 'General',
+            'year_level' => '1st_year',
+        ];
+
+        if ($hasLecLabColumns) {
+            $payload['lec_unit'] = (int) $validated['lec_unit'];
+            $payload['lab_unit'] = (int) $validated['lab_unit'];
+        } else {
+            $totalUnits = (int) $validated['lec_unit'] + (int) $validated['lab_unit'];
+            if (Schema::hasColumn('subjects', 'hours')) {
+                $payload['hours'] = $totalUnits;
+            }
+            if (Schema::hasColumn('subjects', 'unit')) {
+                $payload['unit'] = $totalUnits;
+            }
+        }
+
+        Subject::create($payload);
 
         return redirect()->route('admin.subjects.index')
             ->with('success', 'Subject created successfully.');
@@ -61,18 +86,42 @@ class SubjectController extends Controller
 
     public function update(Request $request, Subject $subject)
     {
+        $hasLecLabColumns = Schema::hasColumn('subjects', 'lec_unit') && Schema::hasColumn('subjects', 'lab_unit');
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'nullable|string|max:255|unique:subjects,code,' . $subject->id,
-            'year_level' => 'required|string|max:255',
-            'semester' => 'required|string|max:255',
-            'course_strand' => 'required|string|max:255',
-            'hours' => 'required|integer|min:1',
-            'required_room_type' => 'required|in:lecture,laboratory,computer_lab,science_lab,workshop,any',
+            'lec_unit' => 'required|integer|min:0|max:99',
+            'lab_unit' => 'required|integer|min:0|max:99',
+            'required_room_type' => 'required|in:lecture,computer_lab,chemistry_lab',
+            'status' => 'required|in:active,inactive',
             'description' => 'nullable|string',
         ]);
 
-        $subject->update($validated);
+        $payload = [
+            'name' => $validated['name'],
+            'code' => $validated['code'] ?? null,
+            'required_room_type' => $validated['required_room_type'],
+            'status' => $validated['status'],
+            'description' => $validated['description'] ?? null,
+            'course_strand' => $subject->course_strand ?? 'General',
+            'year_level' => $subject->year_level ?? '1st_year',
+        ];
+
+        if ($hasLecLabColumns) {
+            $payload['lec_unit'] = (int) $validated['lec_unit'];
+            $payload['lab_unit'] = (int) $validated['lab_unit'];
+        } else {
+            $totalUnits = (int) $validated['lec_unit'] + (int) $validated['lab_unit'];
+            if (Schema::hasColumn('subjects', 'hours')) {
+                $payload['hours'] = $totalUnits;
+            }
+            if (Schema::hasColumn('subjects', 'unit')) {
+                $payload['unit'] = $totalUnits;
+            }
+        }
+
+        $subject->update($payload);
 
         return redirect()->route('admin.subjects.index')
             ->with('success', 'Subject updated successfully.');

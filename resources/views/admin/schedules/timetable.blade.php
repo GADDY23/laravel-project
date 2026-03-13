@@ -28,7 +28,7 @@
             <button type="button" id="publish-week-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-center">
                 Publish Week
             </button>
-            <a href="{{ route('admin.schedules.configure', ['reset' => 1]) }}" id="cancel-schedule-btn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-center">Cancel</a>
+            <a href="{{ $schedules->isNotEmpty() ? route('admin.schedules.index') : route('admin.schedules.configure', ['reset' => 1]) }}" id="cancel-schedule-btn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-center">Cancel</a>
         </div>
         
     </div>
@@ -43,6 +43,28 @@
         <button type="button" id="conflict-popup-close" class="text-red-700 hover:text-red-900 text-lg leading-none">&times;</button>
     </div>
     <ul id="conflict-popup-list" class="px-4 py-3 space-y-1 text-sm"></ul>
+</div>
+
+<div id="teacher-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+    <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <p class="text-sm font-semibold text-gray-900">Assign Teacher</p>
+                <p class="text-xs text-gray-500" id="teacher-modal-subject">Select a teacher for this subject.</p>
+            </div>
+            <button type="button" id="teacher-modal-close" class="text-gray-400 hover:text-gray-700 text-lg leading-none">&times;</button>
+        </div>
+        <div class="mt-4 space-y-2">
+            <label class="text-xs font-medium text-gray-600">Teacher</label>
+            <select id="teacher-modal-select" class="w-full rounded-md border-gray-300 shadow-sm text-sm">
+                <option value="">No teacher</option>
+            </select>
+        </div>
+        <div class="mt-6 flex items-center justify-end gap-3">
+            <button type="button" id="teacher-modal-cancel" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancel</button>
+            <button type="button" id="teacher-modal-save" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Save</button>
+        </div>
+    </div>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -188,7 +210,7 @@
             $availableRooms = $rooms->whereNotIn('id', $selectedRoomIds);
             $selectedRoomsForSelect = $rooms->whereIn('id', $selectedRoomIds);
         @endphp
-        <div class="flex flex-wrap items-center justify-between gap-10 mb-2">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
             <div class="inline-flex rounded-lg bg-gray-100 dark:bg-gray-900 p-1">
                 <button type="button" class="timetable-tab px-4 py-1.5 text-sm font-semibold rounded-md bg-white text-gray-900 shadow-sm" data-view="room">
                     Rooms
@@ -481,6 +503,9 @@
                                                                     {{ \Illuminate\Support\Str::limit($scheduleInCell['schedule']->subject->name, 32) }}
                                                                 </div>
                                                                 <div class="meta-line text-gray-700 dark:text-gray-300">{{ $scheduleInCell['schedule']->section->name }}</div>
+                                                                @if(!empty($scheduleInCell['schedule']->teacher))
+                                                                    <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->teacher->name }}</div>
+                                                                @endif
                                                                 <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name }}</div>
                                                             </div>
                                                         </div>
@@ -502,8 +527,9 @@
 
             {{-- Teacher view --}}
             <div id="view-teacher" class="view-mode hidden">
+                <div id="teacher-empty-state" class="text-sm text-gray-500 dark:text-gray-400 hidden">Select a teacher in a block to show their timetable.</div>
                 @foreach($teachers as $teacher)
-                    <div class="mb-8">
+                    <div class="mb-8 teacher-block" data-teacher-id="{{ $teacher->id }}">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Teacher: {{ $teacher->name }}</h3>
                         <div class="overflow-x-auto bg-white dark:bg-gray-900 rounded-lg shadow-sm">
                             <table class="min-w-full border-collapse">
@@ -606,6 +632,9 @@
                                                                     {{ \Illuminate\Support\Str::limit($scheduleInCell['schedule']->subject->name, 32) }}
                                                                 </div>
                                                                 <div class="meta-line text-gray-700 dark:text-gray-300">{{ $scheduleInCell['schedule']->section->name }}</div>
+                                                                @if(!empty($scheduleInCell['schedule']->teacher))
+                                                                    <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->teacher->name }}</div>
+                                                                @endif
                                                                 <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name }}</div>
                                                             </div>
                                                         </div>
@@ -734,6 +763,9 @@
                                                                         {{ \Illuminate\Support\Str::limit($scheduleInCell['schedule']->subject->name, 32) }}
                                                                     </div>
                                                                     <div class="meta-line text-gray-700 dark:text-gray-300">{{ $scheduleInCell['schedule']->section->name }}</div>
+                                                                    @if(!empty($scheduleInCell['schedule']->teacher))
+                                                                        <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->teacher->name }}</div>
+                                                                    @endif
                                                                     <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name }}</div>
                                                                 </div>
                                                             </div>
@@ -820,6 +852,10 @@
     })->values();
 
     $schedulesPayload = $schedules->map(function ($schedule) {
+        $start = \Carbon\Carbon::parse($schedule->time_start);
+        $end = \Carbon\Carbon::parse($schedule->time_end);
+        $durationMinutes = max(0, $end->diffInMinutes($start, false));
+        $slotCount = $schedule->slot_count ?? (int) max(1, ceil($durationMinutes / 60));
         return [
             'id' => $schedule->id,
             'teacher_id' => $schedule->teacher_id,
@@ -830,6 +866,7 @@
             'day' => strtolower($schedule->day),
             'time_start' => \Carbon\Carbon::parse($schedule->time_start)->format('H:i'),
             'time_end' => \Carbon\Carbon::parse($schedule->time_end)->format('H:i'),
+            'slot_count' => $slotCount,
             'is_published' => (bool) ($schedule->is_published ?? false),
         ];
     })->values();
@@ -914,6 +951,12 @@
         color: #059669;
     }
 
+    .subject-draggable.subject-locked {
+        opacity: 0.55;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
     .timetable-tab.active {
         background: #ffffff;
         color: #111827;
@@ -928,32 +971,6 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    console.debug('Timetable script loaded');
-
-    // Debug overlay (helps verify script is running in the browser)
-    const debugOverlay = document.createElement('div');
-    debugOverlay.id = 'timetable-debug-overlay';
-    debugOverlay.style.position = 'fixed';
-    debugOverlay.style.top = '1rem';
-    debugOverlay.style.right = '1rem';
-    debugOverlay.style.zIndex = '9999';
-    debugOverlay.style.background = 'rgba(0, 0, 0, 0.7)';
-    debugOverlay.style.color = 'white';
-    debugOverlay.style.fontSize = '12px';
-    debugOverlay.style.lineHeight = '1.3';
-    debugOverlay.style.padding = '0.5rem 0.75rem';
-    debugOverlay.style.borderRadius = '0.5rem';
-    debugOverlay.style.maxWidth = '240px';
-    debugOverlay.style.pointerEvents = 'none';
-    debugOverlay.innerText = 'debug: script loaded';
-    document.body.appendChild(debugOverlay);
-
-    function setDebug(text) {
-        if (debugOverlay) debugOverlay.innerText = text;
-        console.debug(text);
-    }
-
-    setDebug('script loaded');
 
     const draggableItem = document.getElementById('draggable-schedule');
     const termFilter = document.getElementById('term-filter');
@@ -978,6 +995,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const previewSubject = document.getElementById('preview-subject');
     const previewTeacher = document.getElementById('preview-teacher');
     const previewSection = document.getElementById('preview-section');
+
+    const teacherModal = document.getElementById('teacher-modal');
+    const teacherModalSelect = document.getElementById('teacher-modal-select');
+    const teacherModalClose = document.getElementById('teacher-modal-close');
+    const teacherModalCancel = document.getElementById('teacher-modal-cancel');
+    const teacherModalSave = document.getElementById('teacher-modal-save');
+    const teacherModalSubject = document.getElementById('teacher-modal-subject');
+
+    let activeScheduleForTeacher = null;
     const previewRoom = document.getElementById('preview-room');
     const previewDuration = document.getElementById('preview-duration');
     const previewStatus = document.getElementById('preview-status');
@@ -1096,6 +1122,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setTimetableView(view) {
         const selected = view === 'section' || view === 'teacher' ? view : 'room';
+        syncSchedulesFromVisibleView();
         if (viewRoom) viewRoom.classList.toggle('hidden', selected !== 'room');
         if (viewSection) viewSection.classList.toggle('hidden', selected !== 'section');
         if (viewTeacher) viewTeacher.classList.toggle('hidden', selected !== 'teacher');
@@ -1131,7 +1158,31 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshTeacherView();
         }
 
+        if (selected === 'section' || selected === 'teacher') {
+            syncSchedulesFromVisibleView();
+        }
+
         applySidebarGradient();
+    }
+
+    function syncSchedulesFromVisibleView() {
+        const visibleView = document.querySelector('#timetable-views .view-mode:not(.hidden)');
+        if (!visibleView) return;
+        const items = visibleView.querySelectorAll('.schedule-item');
+        if (!items.length) return;
+        items.forEach((item) => {
+            const scheduleId = item.dataset.scheduleId;
+            const index = schedulesData.findIndex((entry) => String(entry.id) === String(scheduleId));
+            if (index < 0) return;
+            const height = item.getBoundingClientRect().height || 0;
+            const slotCount = item.dataset.slotCount || String(getSlotCountFromHeight(height));
+            schedulesData[index] = {
+                ...schedulesData[index],
+                time_start: item.dataset.timeStart,
+                time_end: item.dataset.timeEnd,
+                slot_count: slotCount
+            };
+        });
     }
 
     const adminSidebar = document.querySelector('.admin-sidebar');
@@ -1349,6 +1400,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         return [subject.name, subject.code].some((value) => expertise.includes(normalize(value)));
+    }
+
+    function buildTeacherOptions(subjectId, selectedId) {
+        const subject = subjectMap.get(String(subjectId));
+        const options = [{ value: '', label: 'No teacher' }];
+        teachersData.forEach((teacher) => {
+            const compatible = isTeacherCompatible(teacher, subject);
+            options.push({
+                value: String(teacher.id),
+                label: compatible ? `${teacher.name} (Compatible)` : teacher.name
+            });
+        });
+        teacherModalSelect.innerHTML = '';
+        options.forEach((opt) => {
+            const optionEl = document.createElement('option');
+            optionEl.value = opt.value;
+            optionEl.textContent = opt.label;
+            teacherModalSelect.appendChild(optionEl);
+        });
+        if (selectedId !== undefined && selectedId !== null) {
+            teacherModalSelect.value = String(selectedId);
+        } else {
+            teacherModalSelect.value = '';
+        }
+    }
+
+    function openTeacherModal(scheduleItem) {
+        if (!teacherModal || !scheduleItem) return;
+        activeScheduleForTeacher = scheduleItem;
+        const subjectId = scheduleItem.dataset.subjectId;
+        const subjectName = subjectMap.get(String(subjectId))?.name || 'Selected subject';
+        const currentTeacherId = scheduleItem.dataset.teacherId || '';
+        teacherModalSubject.textContent = subjectName;
+        buildTeacherOptions(subjectId, currentTeacherId);
+        teacherModal.classList.remove('hidden');
+        teacherModal.classList.add('flex');
+    }
+
+    function closeTeacherModal() {
+        if (!teacherModal) return;
+        teacherModal.classList.add('hidden');
+        teacherModal.classList.remove('flex');
+        activeScheduleForTeacher = null;
     }
 
     function getDefaultTeacherId(subjectId) {
@@ -1676,6 +1770,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleSubjectPointerDown(e) {
         const card = e.target.closest('.subject-draggable');
         if (!card || (e.button !== undefined && e.button !== 0)) return;
+        if (card.classList.contains('subject-locked')) return;
 
         // Prevent text selection and native drag behaviors.
         e.preventDefault();
@@ -1696,7 +1791,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!subjectId || !sectionId || !termId) return;
 
         const defaultRoomId = getDefaultRoomId(subjectId);
-        const defaultTeacherId = getDefaultTeacherId(subjectId);
+        const defaultTeacherId = null;
         const duration = parseFloat(durationInput.value) || 1;
 
         draggedData = {
@@ -1925,12 +2020,27 @@ document.addEventListener('DOMContentLoaded', () => {
         normalized.time_start = normalizeTimeValue(schedule.time_start);
         normalized.time_end = normalizeTimeValue(schedule.time_end);
         normalized.is_published = !!schedule.is_published;
+        if (!normalized.slot_count && normalized.time_start && normalized.time_end) {
+            normalized.slot_count = getSlotCountFromTimes(normalized.time_start, normalized.time_end);
+        }
         return normalized;
     }
 
     function findSubjectListItems(subjectId, sectionId) {
         if (!subjectId || !sectionId) return [];
         return Array.from(document.querySelectorAll(`.subject-draggable[data-subject-id="${subjectId}"][data-section-id="${sectionId}"]`));
+    }
+
+    function lockSubjectCard(card) {
+        if (!card) return;
+        card.classList.add('subject-locked');
+        card.setAttribute('aria-disabled', 'true');
+    }
+
+    function unlockSubjectCard(card) {
+        if (!card) return;
+        card.classList.remove('subject-locked');
+        card.removeAttribute('aria-disabled');
     }
 
     function updateSidebarAssignment(schedule, options = {}) {
@@ -1946,6 +2056,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (options.clear) {
                 meta.textContent = '';
                 meta.classList.add('hidden');
+                unlockSubjectCard(target);
                 return;
             }
 
@@ -1958,6 +2069,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             meta.textContent = parts.join(' · ');
             meta.classList.remove('hidden');
+            lockSubjectCard(target);
         });
     }
 
@@ -1978,20 +2090,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function collectDraftSchedules() {
-        const roomViewItems = Array.from(document.querySelectorAll('#view-room .schedule-item'));
-        if (roomViewItems.length) {
-            return roomViewItems.map((item) => ({
-                teacher_id: item.dataset.teacherId || null,
-                subject_id: item.dataset.subjectId,
-                section_id: item.dataset.sectionId,
-                room_id: item.dataset.roomId,
-                term_id: item.dataset.termId,
-                day: item.dataset.day,
-                time_start: item.dataset.timeStart,
-                time_end: item.dataset.timeEnd
-            }));
-        }
-
         return schedulesData.map((schedule) => ({
             teacher_id: schedule.teacher_id || null,
             subject_id: schedule.subject_id,
@@ -2000,7 +2098,8 @@ document.addEventListener('DOMContentLoaded', () => {
             term_id: schedule.term_id,
             day: schedule.day,
             time_start: schedule.time_start,
-            time_end: schedule.time_end
+            time_end: schedule.time_end,
+            slot_count: schedule.slot_count
         }));
     }
 
@@ -2046,6 +2145,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 day: normalized.day,
                 time_start: normalized.time_start,
                 time_end: normalized.time_end,
+                slot_count: normalized.slot_count,
                 is_published: normalized.is_published
             };
         } else {
@@ -2059,6 +2159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 day: normalized.day,
                 time_start: normalized.time_start,
                 time_end: normalized.time_end,
+                slot_count: normalized.slot_count,
                 is_published: normalized.is_published
             });
         }
@@ -2104,6 +2205,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const subjectName = subject?.name || 'Subject';
         const sectionName = section?.name || '';
         const roomName = room?.name || '';
+        const teacherName = schedule.teacher_id
+            ? (teachersMap.get(String(schedule.teacher_id))?.name || '')
+            : '';
         const colorClass = getScheduleColorClass(schedule.subject_id);
         const sizeClass = slotCount <= 1 ? 'size-xs' : (slotCount <= 2 ? 'size-sm' : 'size-md');
 
@@ -2139,6 +2243,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${subjectName.length > 32 ? `${subjectName.slice(0, 32)}...` : subjectName}
                 </div>
                 <div class="meta-line text-gray-700 dark:text-gray-300">${sectionName}</div>
+                ${teacherName ? `<div class="meta-line text-gray-600 dark:text-gray-400">${teacherName}</div>` : ''}
                 <div class="meta-line text-gray-600 dark:text-gray-400">${roomName}</div>
             </div>
         `;
@@ -2195,34 +2300,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function insertScheduleIntoView(viewType, schedule, overrideCell = null) {
         const cell = findTargetCell(schedule, viewType, overrideCell);
         if (!cell) return;
-        const slotCount = schedule.slot_count
-            ? Math.max(1, parseInt(schedule.slot_count, 10))
-            : getSlotCountFromTimes(schedule.time_start, schedule.time_end);
-        if (schedule.slot_count && schedule.time_start) {
-            schedule.time_end = getEndTimeFromStartAndSlots(schedule.time_start, slotCount);
-        }
+        const slotCount = (schedule.time_start && schedule.time_end)
+            ? getSlotCountFromTimes(schedule.time_start, schedule.time_end)
+            : Math.max(1, parseInt(schedule.slot_count || '1', 10));
         const scheduleEl = buildScheduleItemElement(schedule, slotCount);
         cell.appendChild(scheduleEl);
         observeScheduleItem(scheduleEl);
     }
 
     function getCurrentScheduleSnapshots() {
-        const roomItems = Array.from(document.querySelectorAll('#view-room .schedule-item'));
-        if (roomItems.length) {
-            return roomItems.map((item) => ({
-                id: item.dataset.scheduleId,
-                teacher_id: item.dataset.teacherId || null,
-                subject_id: item.dataset.subjectId,
-                section_id: item.dataset.sectionId,
-                room_id: item.dataset.roomId,
-                term_id: item.dataset.termId,
-                day: item.dataset.day,
-                time_start: item.dataset.timeStart,
-                time_end: item.dataset.timeEnd,
-                slot_count: item.dataset.slotCount,
-                is_published: item.dataset.isPublished === '1'
-            }));
-        }
         return schedulesData.map((item) => ({
             id: item.id,
             teacher_id: item.teacher_id || null,
@@ -2233,6 +2319,7 @@ document.addEventListener('DOMContentLoaded', () => {
             day: item.day,
             time_start: item.time_start,
             time_end: item.time_end,
+            slot_count: item.slot_count,
             is_published: item.is_published
         }));
     }
@@ -2252,7 +2339,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 insertScheduleIntoView('teacher', schedule);
             }
         });
+        updateTeacherVisibility();
         ensureResizeHandles();
+    }
+
+    function updateTeacherVisibility() {
+        const teacherBlocks = document.querySelectorAll('#view-teacher .teacher-block');
+        const emptyState = document.getElementById('teacher-empty-state');
+        const visibleTeacherIds = new Set(
+            getCurrentScheduleSnapshots()
+                .map((s) => s.teacher_id)
+                .filter(Boolean)
+                .map((id) => String(id))
+        );
+
+        let shown = 0;
+        teacherBlocks.forEach((block) => {
+            const teacherId = block.dataset.teacherId;
+            if (teacherId && visibleTeacherIds.has(String(teacherId))) {
+                block.classList.remove('hidden');
+                shown += 1;
+            } else {
+                block.classList.add('hidden');
+            }
+        });
+
+        if (emptyState) {
+            emptyState.classList.toggle('hidden', shown > 0);
+        }
     }
 
     function applyDraftSchedulesToView(draftSchedules) {
@@ -2435,6 +2549,88 @@ document.addEventListener('DOMContentLoaded', () => {
     teacherSelect.addEventListener('change', () => {
         teacherSelectionConfirmed = teacherSelect.value !== '';
         markCardAsPending();
+    });
+
+    teacherModalClose?.addEventListener('click', closeTeacherModal);
+    teacherModalCancel?.addEventListener('click', closeTeacherModal);
+    teacherModal?.addEventListener('click', (e) => {
+        if (e.target === teacherModal) {
+            closeTeacherModal();
+        }
+    });
+    teacherModalSave?.addEventListener('click', async () => {
+        if (!activeScheduleForTeacher) {
+            closeTeacherModal();
+            return;
+        }
+
+        const scheduleItem = activeScheduleForTeacher;
+        const scheduleId = scheduleItem.dataset.scheduleId;
+        const newTeacherId = teacherModalSelect.value || null;
+
+        const payload = {
+            id: scheduleId,
+            schedule_id: scheduleId,
+            teacher_id: newTeacherId,
+            subject_id: scheduleItem.dataset.subjectId,
+            section_id: scheduleItem.dataset.sectionId,
+            room_id: scheduleItem.dataset.roomId,
+            term_id: scheduleItem.dataset.termId,
+            day: scheduleItem.dataset.day,
+            time_start: scheduleItem.dataset.timeStart,
+            time_end: scheduleItem.dataset.timeEnd,
+            is_published: scheduleItem.dataset.isPublished === '1'
+        };
+
+        if (!autosaveEnabled) {
+            const conflicts = getLocalConflicts(payload, scheduleId);
+            if (Object.keys(conflicts).length) {
+                showConflictPopup(conflicts);
+                return;
+            }
+            applyScheduleUpdate(payload);
+            saveDraftState();
+            closeTeacherModal();
+            return;
+        }
+
+        try {
+            const updateUrl = endpoints.updateTemplate.replace('__SCHEDULE_ID__', scheduleId);
+            const response = await fetch(updateUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    _method: 'PUT',
+                    teacher_id: newTeacherId,
+                    subject_id: payload.subject_id,
+                    section_id: payload.section_id,
+                    room_id: payload.room_id,
+                    term_id: payload.term_id,
+                    day: payload.day,
+                    time_start: payload.time_start,
+                    time_end: payload.time_end
+                })
+            });
+
+            const result = await response.json();
+            if (!response.ok || result.success === false) {
+                const message = result.message || 'Failed to update teacher.';
+                alert(message);
+                return;
+            }
+
+            if (result.schedule) {
+                applyScheduleUpdate(result.schedule);
+            }
+            closeTeacherModal();
+        } catch (error) {
+            alert('Unable to update teacher: ' + (error.message || 'Unknown error'));
+        }
     });
 
     // Quick duration presets
@@ -2666,6 +2862,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const subjectCard = e.target.closest('.subject-draggable');
         if (subjectCard) {
+            if (subjectCard.classList.contains('subject-locked')) {
+                e.preventDefault();
+                return;
+            }
             console.debug('dragstart on subject card', { subjectId: subjectCard.dataset.subjectId });
             const subjectId = subjectCard.dataset.subjectId;
             const sectionId = subjectCard.dataset.sectionId;
@@ -2678,7 +2878,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const defaultRoomId = getDefaultRoomId(subjectId);
-            const defaultTeacherId = getDefaultTeacherId(subjectId);
+        const defaultTeacherId = null;
             const duration = parseFloat(durationInput.value) || 1;
 
             draggedData = {
@@ -2849,6 +3049,7 @@ document.addEventListener('DOMContentLoaded', () => {
             timeEnd = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
         }
 
+        const slotCount = getSlotCountFromTimes(timeStart, timeEnd);
         const isUpdate = placementData.schedule_id && placementData.schedule_id !== 'undefined' && placementData.schedule_id !== '';
         if (isUpdate && placementData.day === day && placementData.time_start === timeStart && placementData.time_end === timeEnd) {
             return;
@@ -2873,6 +3074,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 day: day,
                 time_start: timeStart,
                 time_end: timeEnd,
+                slot_count: slotCount,
                 is_published: false
             };
 
@@ -2942,16 +3144,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            let saveData = {
-                teacher_id: placementData.teacher_id || null,
-                subject_id: placementData.subject_id,
-                section_id: placementData.section_id,
-                room_id: roomId,
-                term_id: placementData.term_id,
-                day: day,
-                time_start: timeStart,
-                time_end: timeEnd
-            };
+        const resolvedTeacherId = isUpdate ? (placementData.teacher_id || null) : null;
+        let saveData = {
+            teacher_id: resolvedTeacherId,
+            subject_id: placementData.subject_id,
+            section_id: placementData.section_id,
+            room_id: roomId,
+            term_id: placementData.term_id,
+            day: day,
+            time_start: timeStart,
+            time_end: timeEnd
+        };
 
             if (placementData.curriculum_id) {
                 saveData.curriculum_id = placementData.curriculum_id;
@@ -3161,6 +3364,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!result && resizeOriginalEndTime) {
             resizingScheduleItem.dataset.timeEnd = resizeOriginalEndTime;
         }
+        if (result) {
+            refreshSectionView();
+            refreshTeacherView();
+        }
 
         if (resizeWasDraggable !== null) {
             resizingScheduleItem.draggable = resizeWasDraggable;
@@ -3186,7 +3393,8 @@ document.addEventListener('DOMContentLoaded', () => {
             term_id: item.dataset.termId,
             day: item.dataset.day,
             time_start: item.dataset.timeStart,
-            time_end: item.dataset.timeEnd
+            time_end: item.dataset.timeEnd,
+            slot_count: item.dataset.slotCount
         };
     }
 
@@ -3334,6 +3542,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const scheduleCard = e.target.closest('.schedule-item');
+        if (scheduleCard) {
+            e.preventDefault();
+            e.stopPropagation();
+            openTeacherModal(scheduleCard);
+            return;
+        }
+
         if (!clickPlaceMode) return;
         if (e.target.closest('.schedule-item')) return;
 
@@ -3349,3 +3565,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 @endsection
+

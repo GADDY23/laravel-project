@@ -6,6 +6,9 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Database\Seeders\RoomSeeder;
+use Database\Seeders\SectionSeeder;
+use Database\Seeders\SubjectSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -28,5 +31,11 @@ class DatabaseSeeder extends Seeder
                 'email_verified_at' => now(),
             ],
         );
+
+        $this->call([
+            RoomSeeder::class,
+            SectionSeeder::class,
+            SubjectSeeder::class,
+        ]);
     }
 }

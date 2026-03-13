@@ -8,6 +8,9 @@
 
 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 max-w-3xl">
     <form action="{{ route('admin.schedules.timetable') }}" method="GET" class="space-y-6">
+        @if(request()->boolean('reset'))
+            <input type="hidden" name="reset" value="1">
+        @endif
         <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Schedule Name</label>
             <input type="text" name="schedule_name" value="{{ old('schedule_name', $scheduleName ?? '') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="E.g. BSIS Timetable - 1st Semester" required>

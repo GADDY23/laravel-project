@@ -70,10 +70,8 @@
                 @php
                     $timeSlots = [];
                     for ($hour = 7; $hour < 19; $hour++) {
-                        $timeSlots[] = sprintf('%02d:00', $hour) . ' - ' . sprintf('%02d:30', $hour);
-                        $timeSlots[] = sprintf('%02d:30', $hour) . ' - ' . sprintf('%02d:00', $hour + 1);
+                        $timeSlots[] = sprintf('%02d:00', $hour) . ' - ' . sprintf('%02d:00', $hour + 1);
                     }
-                    $timeSlots[] = '19:00 - 19:30';
 
                     $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
                     $dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -81,6 +79,9 @@
                     $timeToMinutes = function ($time) {
                         $parts = explode(':', $time);
                         return ((int) $parts[0] * 60) + (int) $parts[1];
+                    };
+                    $formatStandard = function ($time) {
+                        return \Carbon\Carbon::createFromFormat('H:i', $time)->format('g:i A');
                     };
 
                     $schedulePositions = [];
@@ -102,7 +103,7 @@
                         }
 
                         if ($startSlotIndex !== null) {
-                            $slotCount = ($endMin - $startMin) / 30;
+                            $slotCount = ($endMin - $startMin) / 60;
                             $schedulePositions[] = [
                                 'schedule' => $schedule,
                                 'dayIndex' => array_search($day, $days),
@@ -120,17 +121,21 @@
                 <table class="min-w-full border-collapse">
                     <thead>
                         <tr>
-                            <th class="bg-green-600 text-white font-bold px-4 py-3 text-center border-2 border-green-700">Time</th>
+                            <th class="bg-blue-600 text-white font-bold px-4 py-3 text-center border-2 border-blue-700">Time</th>
                             @foreach($dayNames as $dayName)
-                                <th class="bg-green-600 text-white font-bold px-4 py-3 text-center border-2 border-green-700">{{ $dayName }}</th>
+                                <th class="bg-blue-600 text-white font-bold px-4 py-3 text-center border-2 border-blue-700">{{ $dayName }}</th>
                             @endforeach
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($timeSlots as $index => $slot)
                             <tr>
-                                <td class="bg-gray-100 px-3 py-2 text-xs text-gray-700 font-medium border border-gray-300 text-right w-32">
-                                    {{ $slot }}
+                                @php
+                                    $slotParts = explode(' - ', $slot);
+                                    $slotLabel = $formatStandard($slotParts[0]) . ' - ' . $formatStandard($slotParts[1]);
+                                @endphp
+                                <td class="bg-gray-100 px-3 py-2 text-xs text-gray-700 font-medium border border-gray-300 text-right w-32 whitespace-nowrap">
+                                    {{ $slotLabel }}
                                 </td>
                                 @foreach($days as $dayIndex => $day)
                                     @php
@@ -163,7 +168,7 @@
                                                     <div class="text-gray-700">{{ $scheduleInCell['schedule']->section->name }}</div>
                                                     <div class="text-gray-600">{{ $scheduleInCell['schedule']->teacher?->name ?? 'TBA' }}</div>
                                                     <div class="text-gray-600">{{ $scheduleInCell['schedule']->room->name }}</div>
-                                                    <div class="text-gray-600">{{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_start)->format('H:i') }} - {{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_end)->format('H:i') }}</div>
+                                                    <div class="text-gray-600">{{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_start)->format('g:i A') }} - {{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_end)->format('g:i A') }}</div>
                                                 </div>
                                             </div>
                                         @elseif(!$isCovered)

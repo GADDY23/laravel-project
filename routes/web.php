@@ -52,6 +52,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('schedules/timetable', [ScheduleController::class, 'timetable'])->name('schedules.timetable');
         Route::post('schedules/store-from-timetable', [ScheduleController::class, 'storeFromTimetable'])->name('schedules.store-from-timetable');
         Route::post('schedules/check-conflicts', [ScheduleController::class, 'checkConflictsAjax'])->name('schedules.check-conflicts');
+        Route::post('schedules/save-draft', [ScheduleController::class, 'saveDraftWeek'])->name('schedules.save-draft');
+        Route::delete('schedules/delete-group', [ScheduleController::class, 'destroyGroup'])->name('schedules.destroy-group');
         Route::post('schedules/publish-week', [ScheduleController::class, 'publishWeek'])->name('schedules.publish-week');
         Route::resource('schedules', ScheduleController::class);
         

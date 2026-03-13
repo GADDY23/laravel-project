@@ -14,9 +14,11 @@ class Schedule extends Model
         'section_id',
         'room_id',
         'term_id',
+        'schedule_name',
         'day',
         'time_start',
         'time_end',
+        'slot_count',
         'is_published',
         'published_at',
     ];
@@ -24,6 +26,7 @@ class Schedule extends Model
     protected $casts = [
         'time_start' => 'datetime:H:i',
         'time_end' => 'datetime:H:i',
+        'slot_count' => 'integer',
         'is_published' => 'boolean',
         'published_at' => 'datetime',
     ];

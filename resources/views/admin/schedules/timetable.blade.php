@@ -22,14 +22,15 @@
 
     <div class="flex flex-col gap-2 lg:items-end">
         <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:w-auto">
+            <button type="button" id="save-schedule-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-center">
+                Save Schedule
+            </button>
             <button type="button" id="publish-week-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-center">
                 Publish Week
             </button>
-            <a href="{{ route('admin.schedules.configure') }}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-center">Back to Configure</a>
+            <a href="{{ $schedules->isNotEmpty() ? route('admin.schedules.index') : route('admin.schedules.configure', ['reset' => 1]) }}" id="cancel-schedule-btn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-center">Cancel</a>
         </div>
-        <div class="text-xs text-gray-500 dark:text-gray-400">
-            Showing both draft and published schedules for review and delete.
-        </div>
+        
     </div>
 </div>
 
@@ -44,6 +45,28 @@
     <ul id="conflict-popup-list" class="px-4 py-3 space-y-1 text-sm"></ul>
 </div>
 
+<div id="teacher-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+    <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <p class="text-sm font-semibold text-gray-900">Assign Teacher</p>
+                <p class="text-xs text-gray-500" id="teacher-modal-subject">Select a teacher for this subject.</p>
+            </div>
+            <button type="button" id="teacher-modal-close" class="text-gray-400 hover:text-gray-700 text-lg leading-none">&times;</button>
+        </div>
+        <div class="mt-4 space-y-2">
+            <label class="text-xs font-medium text-gray-600">Teacher</label>
+            <select id="teacher-modal-select" class="w-full rounded-md border-gray-300 shadow-sm text-sm">
+                <option value="">No teacher</option>
+            </select>
+        </div>
+        <div class="mt-6 flex items-center justify-end gap-3">
+            <button type="button" id="teacher-modal-cancel" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancel</button>
+            <button type="button" id="teacher-modal-save" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Save</button>
+        </div>
+    </div>
+</div>
+
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
     {{-- Left Sidebar - Schedule Builder --}}
     <div class="lg:col-span-3 bg-white dark:bg-gray-800 rounded-lg shadow p-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
@@ -53,18 +76,12 @@
                 $termIdValue = $termId ?? $term?->id ?? null;
             @endphp
 
-@if(!$termIdValue)
-    <p class="text-sm text-gray-500">Select a term to load sections.</p>
-@elseif($sections->isEmpty())
-    <p class="text-sm text-gray-500">No sections found for the selected term.</p>
-@else
-    @php
-        $placedSubjectKeys = $schedules
-            ->map(fn($schedule) => $schedule->subject_id . '-' . $schedule->section_id . '-' . $schedule->term_id)
-            ->unique()
-            ->flip();
-    @endphp
-    <div class="space-y-2">
+            @if(!$termIdValue)
+                <p class="text-sm text-gray-500">Select a term to load sections.</p>
+            @elseif($sections->isEmpty())
+                <p class="text-sm text-gray-500">No sections found for the selected term.</p>
+            @else
+                <div class="space-y-2">
                     @foreach($sectionsPayload as $section)
                         <details class="group border border-gray-200 dark:border-gray-700 rounded-lg" open>
                             <summary class="flex items-center justify-between cursor-pointer px-3 py-2 text-sm font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 rounded-t-lg">
@@ -77,15 +94,15 @@
                                 @else
                                     <ul class="space-y-1">
                                         @foreach($section['subjects'] as $subject)
-                                            @php $cardKey = $subject['id'].'-'.$section['id'].'-'.$termIdValue; @endphp
-                                            <li class="subject-draggable touch-none text-sm text-gray-700 dark:text-gray-300 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-grab {{ $placedSubjectKeys->has($cardKey) ? 'opacity-50 pointer-events-none cursor-not-allowed' : '' }}"
+                                            <li class="subject-draggable touch-none text-sm text-gray-700 dark:text-gray-300 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-grab flex flex-col gap-0.5"
                                                 draggable="false"
                                                 data-subject-id="{{ $subject['id'] }}"
                                                 data-section-id="{{ $section['id'] }}"
-                                                data-card-key="{{ $cardKey }}"
-                                                data-term-id="{{ $termIdValue }}"
-                                                data-locked="{{ $placedSubjectKeys->has($cardKey) ? '1' : '0' }}">
-                                                {{ $subject['code'] ? $subject['code'].' - '.$subject['name'] : $subject['name'] }}
+                                                data-term-id="{{ $termIdValue }}">
+                                                <div class="subject-title">
+                                                    {{ $subject['code'] ? $subject['code'].' - '.$subject['name'] : $subject['name'] }}
+                                                </div>
+                                                <div class="subject-meta hidden"></div>
                                             </li>
                                         @endforeach
                                     </ul>
@@ -134,12 +151,12 @@
                 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Duration (hours)</label>
-                    <input type="number" id="duration" min="0.5" max="4" step="0.5" value="1" class="w-full rounded-md border-gray-300 shadow-sm">
+                    <input type="number" id="duration" min="1" max="4" step="1" value="1" class="w-full rounded-md border-gray-300 shadow-sm">
                     <div class="mt-2 grid grid-cols-4 gap-2">
-                        <button type="button" class="duration-preset text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600" data-duration="0.5">30m</button>
                         <button type="button" class="duration-preset text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600" data-duration="1">1h</button>
-                        <button type="button" class="duration-preset text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600" data-duration="1.5">1.5h</button>
                         <button type="button" class="duration-preset text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600" data-duration="2">2h</button>
+                        <button type="button" class="duration-preset text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600" data-duration="3">3h</button>
+                        <button type="button" class="duration-preset text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600" data-duration="4">4h</button>
                     </div>
                 </div>
 
@@ -188,13 +205,126 @@
             : $rooms;
     @endphp
     <div id="timetable-grid" class="lg:col-span-9 bg-white dark:bg-gray-800 rounded-lg shadow p-4 overflow-x-auto">
-@php
-    $timeSlots = [];
+        @php
+            $selectedRoomIds = array_values(array_filter(array_map('intval', (array) ($selectedRooms ?? []))));
+            $availableRooms = $rooms->whereNotIn('id', $selectedRoomIds);
+            $selectedRoomsForSelect = $rooms->whereIn('id', $selectedRoomIds);
+        @endphp
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <div class="inline-flex rounded-lg bg-gray-100 dark:bg-gray-900 p-1">
+                <button type="button" class="timetable-tab px-4 py-1.5 text-sm font-semibold rounded-md bg-white text-gray-900 shadow-sm" data-view="room">
+                    Rooms
+                </button>
+                <button type="button" class="timetable-tab px-4 py-1.5 text-sm font-semibold rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900" data-view="section">
+                    Sections
+                </button>
+                <button type="button" class="timetable-tab px-4 py-1.5 text-sm font-semibold rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900" data-view="teacher">
+                    Teachers
+                </button>
+            </div>
+            <div class="flex flex-nowrap items-center gap-3 text-sm overflow-x-auto">
+                <form method="GET" action="{{ route('admin.schedules.timetable') }}" class="flex items-center gap-2 room-controls shrink-0">
+                    <input type="hidden" name="term_id" value="{{ $termId }}">
+                    <input type="hidden" name="schedule_name" value="{{ $scheduleName }}">
+                    @foreach($selectedRoomIds as $roomId)
+                        <input type="hidden" name="rooms[]" value="{{ $roomId }}">
+                    @endforeach
+                    <label class="text-xs font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">Add Room</label>
+                    <select name="add_room_id" class="rounded-md border-gray-300 shadow-sm text-sm">
+                        <option value="">Select room</option>
+                        @foreach($availableRooms as $room)
+                            <option value="{{ $room->id }}">{{ $room->name }}</option>
+                        @endforeach
+                    </select>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md">Add</button>
+                </form>
+
+                <form method="GET" action="{{ route('admin.schedules.timetable') }}" class="flex items-center gap-2 section-controls hidden shrink-0">
+                    <input type="hidden" name="term_id" value="{{ $termId }}">
+                    <input type="hidden" name="schedule_name" value="{{ $scheduleName }}">
+                    @foreach($selectedRoomIds as $roomId)
+                        <input type="hidden" name="rooms[]" value="{{ $roomId }}">
+                    @endforeach
+                    <label class="text-xs font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">Add Section</label>
+                    <select name="add_section_id" class="rounded-md border-gray-300 shadow-sm text-sm">
+                        <option value="">Select section</option>
+                        @foreach($sections as $section)
+                            <option value="{{ $section->id }}">{{ $section->name }}</option>
+                        @endforeach
+                    </select>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md">Add</button>
+                </form>
+
+                <form method="GET" action="{{ route('admin.schedules.timetable') }}" class="flex items-center gap-2 section-controls hidden shrink-0">
+                    <input type="hidden" name="term_id" value="{{ $termId }}">
+                    <input type="hidden" name="schedule_name" value="{{ $scheduleName }}">
+                    @foreach($selectedRoomIds as $roomId)
+                        <input type="hidden" name="rooms[]" value="{{ $roomId }}">
+                    @endforeach
+                    <label class="text-xs font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">Delete Section</label>
+                    <select name="remove_section_id" class="rounded-md border-gray-300 shadow-sm text-sm">
+                        <option value="">Select section</option>
+                        @foreach($sections as $section)
+                            <option value="{{ $section->id }}">{{ $section->name }}</option>
+                        @endforeach
+                    </select>
+                    <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-md">Delete</button>
+                </form>
+
+                <form method="GET" action="{{ route('admin.schedules.timetable') }}" class="flex items-center gap-2 teacher-controls hidden shrink-0">
+                    <input type="hidden" name="term_id" value="{{ $termId }}">
+                    <input type="hidden" name="schedule_name" value="{{ $scheduleName }}">
+                    @foreach($selectedRoomIds as $roomId)
+                        <input type="hidden" name="rooms[]" value="{{ $roomId }}">
+                    @endforeach
+                    <label class="text-xs font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">Add Teacher</label>
+                    <select name="add_teacher_id" class="rounded-md border-gray-300 shadow-sm text-sm">
+                        <option value="">Select teacher</option>
+                        @foreach($teachers as $teacher)
+                            <option value="{{ $teacher->id }}">{{ $teacher->name }}</option>
+                        @endforeach
+                    </select>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md">Add</button>
+                </form>
+
+                <form method="GET" action="{{ route('admin.schedules.timetable') }}" class="flex items-center gap-2 teacher-controls hidden shrink-0">
+                    <input type="hidden" name="term_id" value="{{ $termId }}">
+                    <input type="hidden" name="schedule_name" value="{{ $scheduleName }}">
+                    @foreach($selectedRoomIds as $roomId)
+                        <input type="hidden" name="rooms[]" value="{{ $roomId }}">
+                    @endforeach
+                    <label class="text-xs font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">Remove Teacher</label>
+                    <select name="remove_teacher_id" class="rounded-md border-gray-300 shadow-sm text-sm">
+                        <option value="">Select teacher</option>
+                        @foreach($teachers as $teacher)
+                            <option value="{{ $teacher->id }}">{{ $teacher->name }}</option>
+                        @endforeach
+                    </select>
+                    <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-md">Remove</button>
+                </form>
+
+                <form method="GET" action="{{ route('admin.schedules.timetable') }}" class="flex items-center gap-2 room-controls shrink-0">
+                    <input type="hidden" name="term_id" value="{{ $termId }}">
+                    <input type="hidden" name="schedule_name" value="{{ $scheduleName }}">
+                    @foreach($selectedRoomIds as $roomId)
+                        <input type="hidden" name="rooms[]" value="{{ $roomId }}">
+                    @endforeach
+                    <label class="text-xs font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">Remove Room</label>
+                    <select name="remove_room_id" class="rounded-md border-gray-300 shadow-sm text-sm">
+                        <option value="">Select room</option>
+                        @foreach($selectedRoomsForSelect as $room)
+                            <option value="{{ $room->id }}">{{ $room->name }}</option>
+                        @endforeach
+                    </select>
+                    <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-md">Remove</button>
+                </form>
+            </div>
+        </div>
+        @php
+            $timeSlots = [];
             for ($hour = 7; $hour < 19; $hour++) {
-                $timeSlots[] = sprintf('%02d:00', $hour) . ' - ' . sprintf('%02d:30', $hour);
-                $timeSlots[] = sprintf('%02d:30', $hour) . ' - ' . sprintf('%02d:00', $hour + 1);
+                $timeSlots[] = sprintf('%02d:00', $hour) . ' - ' . sprintf('%02d:00', $hour + 1);
             }
-            $timeSlots[] = '19:00 - 19:30';
             
             $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
             $dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -202,6 +332,17 @@
             function timeToMinutes($time) {
                 $parts = explode(':', $time);
                 return (int)$parts[0] * 60 + (int)$parts[1];
+            }
+
+            function formatTimeNoMeridiem($time) {
+                $parts = explode(':', $time);
+                $hour = (int)($parts[0] ?? 0);
+                $minute = (int)($parts[1] ?? 0);
+                $hour12 = $hour % 12;
+                if ($hour12 === 0) {
+                    $hour12 = 12;
+                }
+                return sprintf('%d:%02d', $hour12, $minute);
             }
             
             $schedulePositionsByRoom = [];
@@ -226,7 +367,7 @@
                 }
                 
                 if ($startSlotIndex !== null) {
-                    $slotCount = ($endMin - $startMin) / 30;
+                    $slotCount = (int) max(1, ceil(($endMin - $startMin) / 60));
                     $pos = [
                         'schedule' => $schedule,
                         'day' => $day,
@@ -246,19 +387,14 @@
                 }
             }
             
-    $colorClasses = [
-        'bg-pink-200 dark:bg-pink-900/40',
-        'bg-yellow-200 dark:bg-yellow-900/40',
-        'bg-blue-200 dark:bg-blue-900/40',
-        'bg-green-200 dark:bg-green-900/40',
-        'bg-purple-200 dark:bg-purple-900/40',
-    ];
-
-    $placedSubjectKeys = $schedules
-        ->map(fn($schedule) => $schedule->subject_id . '-' . $schedule->section_id . '-' . $schedule->term_id)
-        ->unique()
-        ->flip();
-@endphp
+            $colorClasses = [
+                'bg-pink-200 dark:bg-pink-900/40',
+                'bg-yellow-200 dark:bg-yellow-900/40',
+                'bg-blue-200 dark:bg-blue-900/40',
+                'bg-green-200 dark:bg-green-900/40',
+                'bg-purple-200 dark:bg-purple-900/40',
+            ];
+        @endphp
 
         <div id="timetable-views" class="space-y-8">
             {{-- Room view --}}
@@ -270,11 +406,11 @@
                             <table class="min-w-full border-collapse">
                                 <thead>
                                     <tr>
-                                        <th class="bg-green-600 dark:bg-green-700 text-white font-bold px-4 py-3 text-center border-2 border-green-700 dark:border-green-800">
+                                        <th class="bg-blue-600 dark:bg-blue-700 text-white font-bold px-4 py-3 text-center border-2 border-blue-700 dark:border-blue-800">
                                             Time
                                         </th>
                                         @foreach($dayNames as $dayName)
-                                            <th class="bg-green-600 dark:bg-green-700 text-white font-bold px-4 py-3 text-center border-2 border-green-700 dark:border-green-800">
+                                            <th class="bg-blue-600 dark:bg-blue-700 text-white font-bold px-4 py-3 text-center border-2 border-blue-700 dark:border-blue-800">
                                                 {{ $dayName }}
                                             </th>
                                         @endforeach
@@ -289,7 +425,7 @@
                                         @endphp
                                         <tr class="relative">
                                             <td class="bg-gray-100 dark:bg-gray-900 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 font-medium border border-gray-300 dark:border-gray-600 text-right w-32">
-                                                {{ $slot }}
+                                                {{ formatTimeNoMeridiem($slotStart) }} - {{ formatTimeNoMeridiem($slotEnd) }}
                                             </td>
 
                                             @foreach($days as $dayIndex => $day)
@@ -320,14 +456,14 @@
                                                     $colorIndex = $scheduleInCell ? (array_search($scheduleInCell['schedule']->subject_id, array_column($schedules->toArray(), 'subject_id')) % count($colorClasses)) : 0;
                                                 @endphp
 
-                                                <td class="relative border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 min-h-[60px] p-0 drop-zone" 
+                                                <td class="relative border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 min-h-[40px] p-0 drop-zone" 
                                                     data-day="{{ $day }}"
                                                     data-time-start="{{ $slotStart }}"
                                                     data-time-end="{{ $slotEnd }}"
                                                     data-room-id="{{ $room->id }}"
                                                     ondragover="event.preventDefault(); event.dataTransfer.dropEffect = 'move';"
                                                     ondrop="handleTimetableDrop(event)"
-                                                    style="height: 60px;">
+                                                    style="height: var(--timetable-slot-height);">
                                                     @if($hasSchedule && $scheduleInCell)
                                                         <div 
                                                             class="schedule-item absolute inset-0 m-0.5 {{ $colorClasses[$colorIndex] }} rounded border border-gray-400 dark:border-gray-600 cursor-move hover:shadow-md transition-shadow"
@@ -338,10 +474,11 @@
                                                             data-room-id="{{ $scheduleInCell['schedule']->room_id }}"
                                                             data-term-id="{{ $scheduleInCell['schedule']->term_id }}"
                                                             data-is-published="{{ $scheduleInCell['schedule']->is_published ? '1' : '0' }}"
+                                                            data-slot-count="{{ $scheduleInCell['slotCount'] }}"
                                                             data-day="{{ $day }}"
                                                             data-time-start="{{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_start)->format('H:i') }}"
                                                             data-time-end="{{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_end)->format('H:i') }}"
-                                                            style="height: calc({{ $scheduleInCell['slotCount'] }} * 60px - 4px); z-index: 10;"
+                                                            style="height: calc({{ $scheduleInCell['slotCount'] }} * var(--timetable-slot-height) - 4px); z-index: 10;"
                                                             draggable="true"
                                                         >
                                                             <button
@@ -353,18 +490,23 @@
                                                             >
                                                                 &times;
                                                             </button>
-                                                            <div class="p-1.5 text-[10px] leading-tight h-full flex flex-col justify-center">
-                                                                <div class="mb-1">
-                                                                    @if($scheduleInCell['schedule']->is_published)
+                                                            @php
+                                                                $sizeClass = $scheduleInCell['slotCount'] <= 1 ? 'size-xs' : ($scheduleInCell['slotCount'] <= 2 ? 'size-sm' : 'size-md');
+                                                            @endphp
+                                                            <div class="schedule-body {{ $sizeClass }} h-full flex flex-col">
+                                                                @if($scheduleInCell['schedule']->is_published)
+                                                                    <div class="mb-1">
                                                                         <span class="inline-flex items-center rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-semibold text-white">PUBLISHED</span>
-                                                                    @else
-                                                                        <span class="inline-flex items-center rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-semibold text-white">DRAFT</span>
-                                                                    @endif
+                                                                    </div>
+                                                                @endif
+                                                                <div class="subject-line font-semibold text-gray-900 dark:text-white" title="{{ $scheduleInCell['schedule']->subject->name }}">
+                                                                    {{ \Illuminate\Support\Str::limit($scheduleInCell['schedule']->subject->name, 32) }}
                                                                 </div>
-                                                                <div class="font-semibold text-gray-900 dark:text-white">{{ $scheduleInCell['schedule']->subject->name }}</div>
-                                                                <div class="text-gray-700 dark:text-gray-300">{{ $scheduleInCell['schedule']->section->name }}</div>
-                                                                <div class="text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->teacher?->name ?? 'TBA' }}</div>
-                                                                <div class="text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name }}</div>
+                                                                <div class="meta-line text-gray-700 dark:text-gray-300">{{ $scheduleInCell['schedule']->section->name }}</div>
+                                                                @if(!empty($scheduleInCell['schedule']->teacher))
+                                                                    <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->teacher->name }}</div>
+                                                                @endif
+                                                                <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name }}</div>
                                                             </div>
                                                         </div>
                                                     @elseif(!$isCovered)
@@ -385,18 +527,19 @@
 
             {{-- Teacher view --}}
             <div id="view-teacher" class="view-mode hidden">
+                <div id="teacher-empty-state" class="text-sm text-gray-500 dark:text-gray-400 hidden">Select a teacher in a block to show their timetable.</div>
                 @foreach($teachers as $teacher)
-                    <div class="mb-8">
+                    <div class="mb-8 teacher-block" data-teacher-id="{{ $teacher->id }}">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Teacher: {{ $teacher->name }}</h3>
                         <div class="overflow-x-auto bg-white dark:bg-gray-900 rounded-lg shadow-sm">
                             <table class="min-w-full border-collapse">
                                 <thead>
                                     <tr>
-                                        <th class="bg-indigo-600 dark:bg-indigo-700 text-white font-bold px-4 py-3 text-center border-2 border-indigo-700 dark:border-indigo-800">
+                                        <th class="bg-blue-600 dark:bg-blue-700 text-white font-bold px-4 py-3 text-center border-2 border-blue-700 dark:border-blue-800">
                                             Time
                                         </th>
                                         @foreach($dayNames as $dayName)
-                                            <th class="bg-indigo-600 dark:bg-indigo-700 text-white font-bold px-4 py-3 text-center border-2 border-indigo-700 dark:border-indigo-800">
+                                            <th class="bg-blue-600 dark:bg-blue-700 text-white font-bold px-4 py-3 text-center border-2 border-blue-700 dark:border-blue-800">
                                                 {{ $dayName }}
                                             </th>
                                         @endforeach
@@ -411,7 +554,7 @@
                                         @endphp
                                         <tr class="relative">
                                             <td class="bg-gray-100 dark:bg-gray-900 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 font-medium border border-gray-300 dark:border-gray-600 text-right w-32">
-                                                {{ $slot }}
+                                                {{ formatTimeNoMeridiem($slotStart) }} - {{ formatTimeNoMeridiem($slotEnd) }}
                                             </td>
 
                                             @foreach($days as $dayIndex => $day)
@@ -442,14 +585,14 @@
                                                     $colorIndex = $scheduleInCell ? (array_search($scheduleInCell['schedule']->subject_id, array_column($schedules->toArray(), 'subject_id')) % count($colorClasses)) : 0;
                                                 @endphp
 
-                                                <td class="relative border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 min-h-[60px] p-0 drop-zone" 
+                                                <td class="relative border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 min-h-[40px] p-0 drop-zone" 
                                                     data-day="{{ $day }}"
                                                     data-time-start="{{ $slotStart }}"
                                                     data-time-end="{{ $slotEnd }}"
                                                     data-teacher-id="{{ $teacher->id }}"
                                                     ondragover="event.preventDefault(); event.dataTransfer.dropEffect = 'move';"
                                                     ondrop="handleTimetableDrop(event)"
-                                                    style="height: 60px;">
+                                                    style="height: var(--timetable-slot-height);">
                                                     @if($hasSchedule && $scheduleInCell)
                                                         <div 
                                                             class="schedule-item absolute inset-0 m-0.5 {{ $colorClasses[$colorIndex] }} rounded border border-gray-400 dark:border-gray-600 cursor-move hover:shadow-md transition-shadow"
@@ -460,10 +603,11 @@
                                                             data-room-id="{{ $scheduleInCell['schedule']->room_id }}"
                                                             data-term-id="{{ $scheduleInCell['schedule']->term_id }}"
                                                             data-is-published="{{ $scheduleInCell['schedule']->is_published ? '1' : '0' }}"
+                                                            data-slot-count="{{ $scheduleInCell['slotCount'] }}"
                                                             data-day="{{ $day }}"
                                                             data-time-start="{{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_start)->format('H:i') }}"
                                                             data-time-end="{{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_end)->format('H:i') }}"
-                                                            style="height: calc({{ $scheduleInCell['slotCount'] }} * 60px - 4px); z-index: 10;"
+                                                            style="height: calc({{ $scheduleInCell['slotCount'] }} * var(--timetable-slot-height) - 4px); z-index: 10;"
                                                             draggable="true"
                                                         >
                                                             <button
@@ -475,18 +619,23 @@
                                                             >
                                                                 &times;
                                                             </button>
-                                                            <div class="p-1.5 text-[10px] leading-tight h-full flex flex-col justify-center">
-                                                                <div class="mb-1">
-                                                                    @if($scheduleInCell['schedule']->is_published)
+                                                            @php
+                                                                $sizeClass = $scheduleInCell['slotCount'] <= 1 ? 'size-xs' : ($scheduleInCell['slotCount'] <= 2 ? 'size-sm' : 'size-md');
+                                                            @endphp
+                                                            <div class="schedule-body {{ $sizeClass }} h-full flex flex-col">
+                                                                @if($scheduleInCell['schedule']->is_published)
+                                                                    <div class="mb-1">
                                                                         <span class="inline-flex items-center rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-semibold text-white">PUBLISHED</span>
-                                                                    @else
-                                                                        <span class="inline-flex items-center rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-semibold text-white">DRAFT</span>
-                                                                    @endif
+                                                                    </div>
+                                                                @endif
+                                                                <div class="subject-line font-semibold text-gray-900 dark:text-white" title="{{ $scheduleInCell['schedule']->subject->name }}">
+                                                                    {{ \Illuminate\Support\Str::limit($scheduleInCell['schedule']->subject->name, 32) }}
                                                                 </div>
-                                                                <div class="font-semibold text-gray-900 dark:text-white">{{ $scheduleInCell['schedule']->subject->name }}</div>
-                                                                <div class="text-gray-700 dark:text-gray-300">{{ $scheduleInCell['schedule']->section->name }}</div>
-                                                                <div class="text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->teacher?->name ?? 'TBA' }}</div>
-                                                                <div class="text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name }}</div>
+                                                                <div class="meta-line text-gray-700 dark:text-gray-300">{{ $scheduleInCell['schedule']->section->name }}</div>
+                                                                @if(!empty($scheduleInCell['schedule']->teacher))
+                                                                    <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->teacher->name }}</div>
+                                                                @endif
+                                                                <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name }}</div>
                                                             </div>
                                                         </div>
                                                     @elseif(!$isCovered)
@@ -507,124 +656,134 @@
 
             {{-- Section view --}}
             <div id="view-section" class="view-mode hidden">
-                @foreach($sections as $section)
-                    <div class="mb-8">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Section: {{ $section->name }}</h3>
-                        <div class="overflow-x-auto bg-white dark:bg-gray-900 rounded-lg shadow-sm">
-                            <table class="min-w-full border-collapse">
-                                <thead>
-                                    <tr>
-                                        <th class="bg-indigo-600 dark:bg-indigo-700 text-white font-bold px-4 py-3 text-center border-2 border-indigo-700 dark:border-indigo-800">
-                                            Time
-                                        </th>
-                                        @foreach($dayNames as $dayName)
-                                            <th class="bg-indigo-600 dark:bg-indigo-700 text-white font-bold px-4 py-3 text-center border-2 border-indigo-700 dark:border-indigo-800">
-                                                {{ $dayName }}
+                @if($sections->isEmpty())
+                    <div class="text-sm text-gray-500 dark:text-gray-400">No sections found for the selected term.</div>
+                @else
+                    @foreach($sections as $section)
+                        <div class="mb-8">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Section: {{ $section->name }}</h3>
+                            <div class="overflow-x-auto bg-white dark:bg-gray-900 rounded-lg shadow-sm">
+                                <table class="min-w-full border-collapse">
+                                    <thead>
+                                        <tr>
+                                            <th class="bg-blue-600 dark:bg-blue-700 text-white font-bold px-4 py-3 text-center border-2 border-blue-700 dark:border-blue-800">
+                                                Time
                                             </th>
-                                        @endforeach
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($timeSlots as $index => $slot)
-                                        @php
-                                            $slotParts = explode(' - ', $slot);
-                                            $slotStart = $slotParts[0];
-                                            $slotEnd = $slotParts[1];
-                                        @endphp
-                                        <tr class="relative">
-                                            <td class="bg-gray-100 dark:bg-gray-900 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 font-medium border border-gray-300 dark:border-gray-600 text-right w-32">
-                                                {{ $slot }}
-                                            </td>
+                                            @foreach($dayNames as $dayName)
+                                                <th class="bg-blue-600 dark:bg-blue-700 text-white font-bold px-4 py-3 text-center border-2 border-blue-700 dark:border-blue-800">
+                                                    {{ $dayName }}
+                                                </th>
+                                            @endforeach
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($timeSlots as $index => $slot)
+                                            @php
+                                                $slotParts = explode(' - ', $slot);
+                                                $slotStart = $slotParts[0];
+                                                $slotEnd = $slotParts[1];
+                                            @endphp
+                                            <tr class="relative">
+                                                <td class="bg-gray-100 dark:bg-gray-900 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 font-medium border border-gray-300 dark:border-gray-600 text-right w-32">
+                                                    {{ formatTimeNoMeridiem($slotStart) }} - {{ formatTimeNoMeridiem($slotEnd) }}
+                                                </td>
 
-                                            @foreach($days as $dayIndex => $day)
-                                                @php
-                                                    $hasSchedule = false;
-                                                    $scheduleInCell = null;
-                                                    $positions = $schedulePositionsBySection[$section->id] ?? [];
-                                                    foreach ($positions as $pos) {
-                                                        if ($pos['dayIndex'] === $dayIndex && $pos['startSlotIndex'] === $index) {
-                                                            $hasSchedule = true;
-                                                            $scheduleInCell = $pos;
-                                                            break;
-                                                        }
-                                                    }
-
-                                                    $isCovered = false;
-                                                    if (!$hasSchedule) {
+                                                @foreach($days as $dayIndex => $day)
+                                                    @php
+                                                        $hasSchedule = false;
+                                                        $scheduleInCell = null;
+                                                        $positions = $schedulePositionsBySection[$section->id] ?? [];
                                                         foreach ($positions as $pos) {
-                                                            if ($pos['dayIndex'] === $dayIndex &&
-                                                                $index > $pos['startSlotIndex'] &&
-                                                                $index < $pos['startSlotIndex'] + $pos['slotCount']) {
-                                                                $isCovered = true;
+                                                            if ($pos['dayIndex'] === $dayIndex && $pos['startSlotIndex'] === $index) {
+                                                                $hasSchedule = true;
+                                                                $scheduleInCell = $pos;
                                                                 break;
                                                             }
                                                         }
-                                                    }
 
-                                                    $colorIndex = $scheduleInCell ? (array_search($scheduleInCell['schedule']->subject_id, array_column($schedules->toArray(), 'subject_id')) % count($colorClasses)) : 0;
-                                                @endphp
+                                                        $isCovered = false;
+                                                        if (!$hasSchedule) {
+                                                            foreach ($positions as $pos) {
+                                                                if ($pos['dayIndex'] === $dayIndex &&
+                                                                    $index > $pos['startSlotIndex'] &&
+                                                                    $index < $pos['startSlotIndex'] + $pos['slotCount']) {
+                                                                    $isCovered = true;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
 
-                                                <td class="relative border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 min-h-[60px] p-0 drop-zone" 
-                                                    data-day="{{ $day }}"
-                                                    data-time-start="{{ $slotStart }}"
-                                                    data-time-end="{{ $slotEnd }}"
-                                                    data-section-id="{{ $section->id }}"
-                                                    ondragover="event.preventDefault(); event.dataTransfer.dropEffect = 'move';"
-                                                    ondrop="handleTimetableDrop(event)"
-                                                    style="height: 60px;">
-                                                    @if($hasSchedule && $scheduleInCell)
-                                                        <div 
-                                                            class="schedule-item absolute inset-0 m-0.5 {{ $colorClasses[$colorIndex] }} rounded border border-gray-400 dark:border-gray-600 cursor-move hover:shadow-md transition-shadow"
-                                                            data-schedule-id="{{ $scheduleInCell['schedule']->id }}"
-                                                            data-teacher-id="{{ $scheduleInCell['schedule']->teacher_id }}"
-                                                            data-subject-id="{{ $scheduleInCell['schedule']->subject_id }}"
-                                                            data-section-id="{{ $scheduleInCell['schedule']->section_id }}"
-                                                            data-room-id="{{ $scheduleInCell['schedule']->room_id }}"
-                                                            data-term-id="{{ $scheduleInCell['schedule']->term_id }}"
-                                                            data-is-published="{{ $scheduleInCell['schedule']->is_published ? '1' : '0' }}"
-                                                            data-day="{{ $day }}"
-                                                            data-time-start="{{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_start)->format('H:i') }}"
-                                                            data-time-end="{{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_end)->format('H:i') }}"
-                                                            style="height: calc({{ $scheduleInCell['slotCount'] }} * 60px - 4px); z-index: 10;"
-                                                            draggable="true"
-                                                        >
-                                                            <button
-                                                                type="button"
-                                                                class="delete-schedule-btn absolute top-1 right-1 h-5 w-5 rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] leading-none flex items-center justify-center shadow"
+                                                        $colorIndex = $scheduleInCell ? (array_search($scheduleInCell['schedule']->subject_id, array_column($schedules->toArray(), 'subject_id')) % count($colorClasses)) : 0;
+                                                    @endphp
+
+                                                    <td class="relative border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 min-h-[40px] p-0 drop-zone" 
+                                                        data-day="{{ $day }}"
+                                                        data-time-start="{{ $slotStart }}"
+                                                        data-time-end="{{ $slotEnd }}"
+                                                        data-section-id="{{ $section->id }}"
+                                                        ondragover="event.preventDefault(); event.dataTransfer.dropEffect = 'move';"
+                                                        ondrop="handleTimetableDrop(event)"
+                                                        style="height: var(--timetable-slot-height);">
+                                                        @if($hasSchedule && $scheduleInCell)
+                                                            <div 
+                                                                class="schedule-item absolute inset-0 m-0.5 {{ $colorClasses[$colorIndex] }} rounded border border-gray-400 dark:border-gray-600 cursor-move hover:shadow-md transition-shadow"
                                                                 data-schedule-id="{{ $scheduleInCell['schedule']->id }}"
-                                                                title="Remove schedule block"
-                                                                aria-label="Remove schedule block"
+                                                                data-teacher-id="{{ $scheduleInCell['schedule']->teacher_id }}"
+                                                                data-subject-id="{{ $scheduleInCell['schedule']->subject_id }}"
+                                                                data-section-id="{{ $scheduleInCell['schedule']->section_id }}"
+                                                                data-room-id="{{ $scheduleInCell['schedule']->room_id }}"
+                                                                data-term-id="{{ $scheduleInCell['schedule']->term_id }}"
+                                                                data-is-published="{{ $scheduleInCell['schedule']->is_published ? '1' : '0' }}"
+                                                                data-slot-count="{{ $scheduleInCell['slotCount'] }}"
+                                                                data-day="{{ $day }}"
+                                                                data-time-start="{{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_start)->format('H:i') }}"
+                                                                data-time-end="{{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_end)->format('H:i') }}"
+                                                                style="height: calc({{ $scheduleInCell['slotCount'] }} * var(--timetable-slot-height) - 4px); z-index: 10;"
+                                                                draggable="true"
                                                             >
-                                                                &times;
-                                                            </button>
-                                                            <div class="p-1.5 text-[10px] leading-tight h-full flex flex-col justify-center">
-                                                                <div class="mb-1">
+                                                                <button
+                                                                    type="button"
+                                                                    class="delete-schedule-btn absolute top-1 right-1 h-5 w-5 rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] leading-none flex items-center justify-center shadow"
+                                                                    data-schedule-id="{{ $scheduleInCell['schedule']->id }}"
+                                                                    title="Remove schedule block"
+                                                                    aria-label="Remove schedule block"
+                                                                >
+                                                                    &times;
+                                                                </button>
+                                                                @php
+                                                                    $sizeClass = $scheduleInCell['slotCount'] <= 1 ? 'size-xs' : ($scheduleInCell['slotCount'] <= 2 ? 'size-sm' : 'size-md');
+                                                                @endphp
+                                                                <div class="schedule-body {{ $sizeClass }} h-full flex flex-col">
                                                                     @if($scheduleInCell['schedule']->is_published)
-                                                                        <span class="inline-flex items-center rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-semibold text-white">PUBLISHED</span>
-                                                                    @else
-                                                                        <span class="inline-flex items-center rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-semibold text-white">DRAFT</span>
+                                                                        <div class="mb-1">
+                                                                            <span class="inline-flex items-center rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-semibold text-white">PUBLISHED</span>
+                                                                        </div>
                                                                     @endif
+                                                                    <div class="subject-line font-semibold text-gray-900 dark:text-white" title="{{ $scheduleInCell['schedule']->subject->name }}">
+                                                                        {{ \Illuminate\Support\Str::limit($scheduleInCell['schedule']->subject->name, 32) }}
+                                                                    </div>
+                                                                    <div class="meta-line text-gray-700 dark:text-gray-300">{{ $scheduleInCell['schedule']->section->name }}</div>
+                                                                    @if(!empty($scheduleInCell['schedule']->teacher))
+                                                                        <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->teacher->name }}</div>
+                                                                    @endif
+                                                                    <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name }}</div>
                                                                 </div>
-                                                                <div class="font-semibold text-gray-900 dark:text-white">{{ $scheduleInCell['schedule']->subject->name }}</div>
-                                                                <div class="text-gray-700 dark:text-gray-300">{{ $scheduleInCell['schedule']->section->name }}</div>
-                                                                <div class="text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->teacher?->name ?? 'TBA' }}</div>
-                                                                <div class="text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name }}</div>
                                                             </div>
-                                                        </div>
-                                                    @elseif(!$isCovered)
-                                                        <div class="absolute inset-0 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors flex items-center justify-center">
-                                                            <span class="text-[9px] text-gray-400 dark:text-gray-500 opacity-0 hover:opacity-100">Drop here</span>
-                                                        </div>
-                                                    @endif
-                                                </td>
-                                            @endforeach
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+                                                        @elseif(!$isCovered)
+                                                            <div class="absolute inset-0 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors flex items-center justify-center">
+                                                                <span class="text-[9px] text-gray-400 dark:text-gray-500 opacity-0 hover:opacity-100">Drop here</span>
+                                                            </div>
+                                                        @endif
+                                                    </td>
+                                                @endforeach
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
-                @endforeach
+                    @endforeach
+                @endif
             </div>
         </div>
     </div>
@@ -693,6 +852,10 @@
     })->values();
 
     $schedulesPayload = $schedules->map(function ($schedule) {
+        $start = \Carbon\Carbon::parse($schedule->time_start);
+        $end = \Carbon\Carbon::parse($schedule->time_end);
+        $durationMinutes = max(0, $end->diffInMinutes($start, false));
+        $slotCount = $schedule->slot_count ?? (int) max(1, ceil($durationMinutes / 60));
         return [
             'id' => $schedule->id,
             'teacher_id' => $schedule->teacher_id,
@@ -703,6 +866,7 @@
             'day' => strtolower($schedule->day),
             'time_start' => \Carbon\Carbon::parse($schedule->time_start)->format('H:i'),
             'time_end' => \Carbon\Carbon::parse($schedule->time_end)->format('H:i'),
+            'slot_count' => $slotCount,
             'is_published' => (bool) ($schedule->is_published ?? false),
         ];
     })->values();
@@ -721,9 +885,87 @@
 @endphp
 
 <style>
+    :root {
+        --timetable-slot-height: 40px;
+    }
+
+    .schedule-body.size-xs {
+        font-size: 8px;
+        line-height: 1.05;
+        padding: 1px;
+        gap: 1px;
+        justify-content: flex-start;
+    }
+
+    .schedule-body.size-sm {
+        font-size: 9px;
+        line-height: 1.2;
+        padding: 4px;
+        gap: 2px;
+        justify-content: center;
+    }
+
+    .schedule-body.size-md {
+        font-size: 10px;
+        line-height: 1.3;
+        padding: 6px;
+        gap: 4px;
+        justify-content: center;
+    }
+
+    .schedule-body .subject-line,
+    .schedule-body .meta-line {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        word-break: break-word;
+    }
+
+    .schedule-body.size-xs .subject-line {
+        -webkit-line-clamp: 1;
+    }
+
+    .schedule-body.size-xs .meta-line {
+        -webkit-line-clamp: 1;
+    }
+
+    .schedule-body.size-sm .subject-line,
+    .schedule-body.size-md .subject-line {
+        -webkit-line-clamp: 2;
+    }
+
+    .schedule-body.size-sm .meta-line,
+    .schedule-body.size-md .meta-line {
+        -webkit-line-clamp: 1;
+    }
+
     .drop-zone-conflict {
         background-color: rgba(239, 68, 68, 0.14) !important;
         box-shadow: inset 0 0 0 2px rgba(239, 68, 68, 0.55);
+    }
+
+    .subject-meta {
+        font-size: 11px;
+        line-height: 1.2;
+        font-weight: 600;
+        color: #059669;
+    }
+
+    .subject-draggable.subject-locked {
+        opacity: 0.55;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    .timetable-tab.active {
+        background: #ffffff;
+        color: #111827;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+
+    .schedule-item,
+    .resize-handle {
+        touch-action: none;
     }
 </style>
 
@@ -744,6 +986,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const teacherSelect = document.getElementById('teacher_id');
     const termInput = document.getElementById('term_id');
     const confirmScheduleCardBtn = document.getElementById('confirm-schedule-card');
+    const saveScheduleBtn = document.getElementById('save-schedule-btn');
     const clickPlaceToggle = document.getElementById('click-place-toggle');
     const reuseLastBtn = document.getElementById('reuse-last');
     const clearFormBtn = document.getElementById('clear-form');
@@ -752,9 +995,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const previewSubject = document.getElementById('preview-subject');
     const previewTeacher = document.getElementById('preview-teacher');
     const previewSection = document.getElementById('preview-section');
+
+    const teacherModal = document.getElementById('teacher-modal');
+    const teacherModalSelect = document.getElementById('teacher-modal-select');
+    const teacherModalClose = document.getElementById('teacher-modal-close');
+    const teacherModalCancel = document.getElementById('teacher-modal-cancel');
+    const teacherModalSave = document.getElementById('teacher-modal-save');
+    const teacherModalSubject = document.getElementById('teacher-modal-subject');
+
+    let activeScheduleForTeacher = null;
     const previewRoom = document.getElementById('preview-room');
     const previewDuration = document.getElementById('preview-duration');
     const previewStatus = document.getElementById('preview-status');
+    const timetableTabs = document.querySelectorAll('.timetable-tab');
+    const viewRoom = document.getElementById('view-room');
+    const viewSection = document.getElementById('view-section');
+    const viewTeacher = document.getElementById('view-teacher');
     const publishWeekBtn = document.getElementById('publish-week-btn');
     const conflictPopup = document.getElementById('conflict-popup');
     const conflictPopupList = document.getElementById('conflict-popup-list');
@@ -767,12 +1023,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastScheduleDraft = null;
     let confirmedDraft = null;
     let teacherSelectionConfirmed = false;
+    const autosaveEnabled = false;
+    let draftIdCounter = 1;
 
     let pointerDragging = false;
     let pointerDragGhost = null;
     let pointerDragCell = null;
     let lastPointerX = 0;
     let lastPointerY = 0;
+    const SLOT_HEIGHT = 40;
 
     // Pointer-driven custom subject drag (replaces native HTML5 drag for consistent behavior)
     let subjectDragActive = false;
@@ -785,6 +1044,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let resizeStartHeight = 0;
     let resizeStartSlots = 0;
     let resizeOriginalHeight = 0;
+    let resizeWasDraggable = null;
+    let resizeOriginalEndTime = null;
 
     const curriculaData = @json($curriculaPayload);
     const subjectsData = @json($subjectsPayload);
@@ -794,10 +1055,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const teachersData = @json($teachersPayload);
     const schedulesData = @json($schedulesPayload);
     const conflictSchedulePool = @json($conflictSchedulesPayload);
+    const colorClasses = @json($colorClasses);
 
     const subjectMap = new Map(subjectsData.map((subject) => [String(subject.id), subject]));
+    const roomsMap = new Map(roomsData.map((room) => [String(room.id), room]));
+    const sectionsMap = new Map(sectionsData.map((section) => [String(section.id), section]));
+    const teachersMap = new Map(teachersData.map((teacher) => [String(teacher.id), teacher]));
     const curriculumMap = new Map(curriculaData.map((curriculum) => [String(curriculum.id), curriculum]));
     const storageKeyCurriculum = 'timetable_selected_curriculum_id';
+    const storageKeyView = 'timetable_view_mode';
+    const storageKeyDraft = 'timetable_draft_state';
 
     const initialScheduleName = @json($scheduleName ?? '');
     const initialSelectedRooms = @json($selectedRooms ?? []);
@@ -806,6 +1073,7 @@ document.addEventListener('DOMContentLoaded', () => {
         timetable: '{{ route("admin.schedules.timetable", [], false) }}',
         checkConflicts: '{{ route("admin.schedules.check-conflicts", [], false) }}',
         storeFromTimetable: '{{ route("admin.schedules.store-from-timetable", [], false) }}',
+        saveDraft: '{{ route("admin.schedules.save-draft", [], false) }}',
         publishWeek: '{{ route("admin.schedules.publish-week", [], false) }}',
         updateTemplate: '{{ route("admin.schedules.update", ["schedule" => "__SCHEDULE_ID__"], false) }}',
         destroyTemplate: '{{ route("admin.schedules.destroy", ["schedule" => "__SCHEDULE_ID__"], false) }}'
@@ -813,6 +1081,129 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function normalize(value) {
         return String(value || '').trim().toLowerCase();
+    }
+
+    function getDraftStorageKey() {
+        const termId = termInput.value || termFilter?.value || '';
+        const roomsKey = (initialSelectedRooms || []).join(',');
+        const nameKey = initialScheduleName || '';
+        return `${storageKeyDraft}:${termId}:${roomsKey}:${nameKey}`;
+    }
+
+    function saveDraftState() {
+        if (autosaveEnabled) return;
+        const payload = getCurrentScheduleSnapshots().map((item) => ({
+            id: item.id,
+            teacher_id: item.teacher_id || null,
+            subject_id: item.subject_id,
+            section_id: item.section_id,
+            room_id: item.room_id,
+            term_id: item.term_id,
+            day: item.day,
+            time_start: item.time_start,
+            time_end: item.time_end,
+            slot_count: item.slot_count,
+            is_published: !!item.is_published
+        }));
+        localStorage.setItem(getDraftStorageKey(), JSON.stringify(payload));
+    }
+
+    function loadDraftState() {
+        if (autosaveEnabled) return [];
+        const raw = localStorage.getItem(getDraftStorageKey());
+        if (!raw) return [];
+        try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function setTimetableView(view) {
+        const selected = view === 'section' || view === 'teacher' ? view : 'room';
+        syncSchedulesFromVisibleView();
+        if (viewRoom) viewRoom.classList.toggle('hidden', selected !== 'room');
+        if (viewSection) viewSection.classList.toggle('hidden', selected !== 'section');
+        if (viewTeacher) viewTeacher.classList.toggle('hidden', selected !== 'teacher');
+
+        document.querySelectorAll('.room-controls').forEach((el) => {
+            el.classList.toggle('hidden', selected !== 'room');
+        });
+        document.querySelectorAll('.section-controls').forEach((el) => {
+            el.classList.toggle('hidden', selected !== 'section');
+        });
+        document.querySelectorAll('.teacher-controls').forEach((el) => {
+            el.classList.toggle('hidden', selected !== 'teacher');
+        });
+
+        timetableTabs.forEach((tab) => {
+            const isActive = tab.dataset.view === selected;
+            tab.classList.toggle('active', isActive);
+            if (isActive) {
+                tab.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+                tab.classList.remove('text-gray-600', 'dark:text-gray-300');
+            } else {
+                tab.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+                tab.classList.add('text-gray-600', 'dark:text-gray-300');
+            }
+        });
+
+        localStorage.setItem(storageKeyView, selected);
+
+        if (selected === 'section') {
+            refreshSectionView();
+        }
+        if (selected === 'teacher') {
+            refreshTeacherView();
+        }
+
+        if (selected === 'section' || selected === 'teacher') {
+            syncSchedulesFromVisibleView();
+        }
+
+        applySidebarGradient();
+    }
+
+    function syncSchedulesFromVisibleView() {
+        const visibleView = document.querySelector('#timetable-views .view-mode:not(.hidden)');
+        if (!visibleView) return;
+        const items = visibleView.querySelectorAll('.schedule-item');
+        if (!items.length) return;
+        items.forEach((item) => {
+            const scheduleId = item.dataset.scheduleId;
+            const index = schedulesData.findIndex((entry) => String(entry.id) === String(scheduleId));
+            if (index < 0) return;
+            const height = item.getBoundingClientRect().height || 0;
+            const slotCount = item.dataset.slotCount || String(getSlotCountFromHeight(height));
+            schedulesData[index] = {
+                ...schedulesData[index],
+                time_start: item.dataset.timeStart,
+                time_end: item.dataset.timeEnd,
+                slot_count: slotCount
+            };
+        });
+    }
+
+    const adminSidebar = document.querySelector('.admin-sidebar');
+    function applySidebarGradient() {
+        if (!adminSidebar) return;
+        adminSidebar.style.background = 'linear-gradient(180deg, #1e3a8a 0%, #112a5f 55%, #0a1533 100%)';
+        adminSidebar.style.backgroundAttachment = 'fixed';
+    }
+
+    const labRoomTypes = new Set(['computer_lab', 'chemistry_lab']);
+
+    function isRoomCompatible(subject, room) {
+        if (!subject || !room) {
+            return false;
+        }
+
+        if (subject.required_room_type === 'lecture') {
+            return room.room_type === 'lecture' || labRoomTypes.has(room.room_type);
+        }
+
+        return room.room_type === subject.required_room_type;
     }
 
     function getConflictLabel(key) {
@@ -958,7 +1349,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const options = roomsData
-            .filter((room) => room.room_type === subject.required_room_type)
+            .filter((room) => isRoomCompatible(subject, room))
             .sort((a, b) => a.name.localeCompare(b.name))
             .map((room) => ({
                 value: String(room.id),
@@ -1011,6 +1402,49 @@ document.addEventListener('DOMContentLoaded', () => {
         return [subject.name, subject.code].some((value) => expertise.includes(normalize(value)));
     }
 
+    function buildTeacherOptions(subjectId, selectedId) {
+        const subject = subjectMap.get(String(subjectId));
+        const options = [{ value: '', label: 'No teacher' }];
+        teachersData.forEach((teacher) => {
+            const compatible = isTeacherCompatible(teacher, subject);
+            options.push({
+                value: String(teacher.id),
+                label: compatible ? `${teacher.name} (Compatible)` : teacher.name
+            });
+        });
+        teacherModalSelect.innerHTML = '';
+        options.forEach((opt) => {
+            const optionEl = document.createElement('option');
+            optionEl.value = opt.value;
+            optionEl.textContent = opt.label;
+            teacherModalSelect.appendChild(optionEl);
+        });
+        if (selectedId !== undefined && selectedId !== null) {
+            teacherModalSelect.value = String(selectedId);
+        } else {
+            teacherModalSelect.value = '';
+        }
+    }
+
+    function openTeacherModal(scheduleItem) {
+        if (!teacherModal || !scheduleItem) return;
+        activeScheduleForTeacher = scheduleItem;
+        const subjectId = scheduleItem.dataset.subjectId;
+        const subjectName = subjectMap.get(String(subjectId))?.name || 'Selected subject';
+        const currentTeacherId = scheduleItem.dataset.teacherId || '';
+        teacherModalSubject.textContent = subjectName;
+        buildTeacherOptions(subjectId, currentTeacherId);
+        teacherModal.classList.remove('hidden');
+        teacherModal.classList.add('flex');
+    }
+
+    function closeTeacherModal() {
+        if (!teacherModal) return;
+        teacherModal.classList.add('hidden');
+        teacherModal.classList.remove('flex');
+        activeScheduleForTeacher = null;
+    }
+
     function getDefaultTeacherId(subjectId) {
         const subject = subjectMap.get(String(subjectId));
         if (!subject) return '';
@@ -1029,7 +1463,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const subject = subjectMap.get(String(subjectId));
         if (!subject) return '';
 
-        const matchingRooms = roomsData.filter((room) => room.room_type === subject.required_room_type);
+        const matchingRooms = roomsData.filter((room) => isRoomCompatible(subject, room));
         if (matchingRooms.length) {
             return String(matchingRooms[0].id);
         }
@@ -1181,12 +1615,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     card.dataset.subjectId = String(subject.id);
                     card.dataset.sectionId = String(section.id);
                     card.dataset.termId = String(termId);
-                    card.dataset.cardKey = buildSubjectCardKey(subject.id, section.id, termId);
-                    if (isSubjectPlaced(subject.id, section.id, termId)) {
-                        card.dataset.locked = '1';
-                        card.classList.add('opacity-50', 'pointer-events-none', 'cursor-not-allowed');
-                        card.title = 'Already placed';
-                    }
 
                     const title = document.createElement('div');
                     title.className = 'font-semibold text-gray-900 dark:text-white text-sm';
@@ -1198,6 +1626,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div>${remainingHours.toFixed(1)} hour(s) remaining</div>
                         <div>${subject.subject_type || ''}</div>
                     `;
+
+                    const assignment = getAssignedScheduleForSubject(subject.id, section.id, termId);
+                    const assignmentMeta = document.createElement('div');
+                    assignmentMeta.className = 'subject-meta mt-1';
+                    assignmentMeta.textContent = '';
+                    assignmentMeta.classList.add('hidden');
+                    if (assignment) {
+                        const roomName = roomsMap.get(String(assignment.room_id))?.name || '';
+                        const dayLabel = capitalizeLabel(assignment.day);
+                        const timeLabel = `${formatTimeLabel(assignment.time_start)} - ${formatTimeLabel(assignment.time_end)}`;
+                        assignmentMeta.textContent = [roomName, dayLabel, timeLabel].filter(Boolean).join(' · ');
+                        assignmentMeta.classList.remove('hidden');
+                    }
 
                     if (remainingHours <= 0) {
                         card.classList.add('opacity-50');
@@ -1211,6 +1652,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     card.appendChild(title);
                     card.appendChild(meta);
+                    card.appendChild(assignmentMeta);
 
                     list.appendChild(card);
                 });
@@ -1223,6 +1665,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Ensure drag handlers are attached to newly rendered subject cards.
         initSubjectDragHandlers(sectionSubjectsContainer);
+        hydrateSidebarAssignments();
     }
 
     function updatePreview(draft) {
@@ -1323,35 +1766,11 @@ document.addEventListener('DOMContentLoaded', () => {
         dragShadowEl = null;
     }
 
-    function buildSubjectCardKey(subjectId, sectionId, termId) {
-        return `${subjectId}-${sectionId}-${termId}`;
-    }
-
-    function lockSubjectCardByKey(cardKey) {
-        if (!cardKey) return;
-        const card = document.querySelector(`[data-card-key="${cardKey}"]`);
-        if (!card) return;
-        card.dataset.locked = '1';
-        card.classList.add('opacity-50', 'pointer-events-none', 'cursor-not-allowed');
-        card.title = 'Already placed';
-    }
-
-    function isSubjectPlaced(subjectId, sectionId, termId) {
-        return schedulesData.some((item) =>
-            String(item.subject_id) === String(subjectId) &&
-            String(item.section_id) === String(sectionId) &&
-            String(item.term_id) === String(termId)
-        );
-    }
-
     // Custom subject drag system using pointer events (works in Edge and avoids native HTML5 drag limitations)
     function handleSubjectPointerDown(e) {
         const card = e.target.closest('.subject-draggable');
         if (!card || (e.button !== undefined && e.button !== 0)) return;
-        if (card.dataset.locked === '1') {
-            e.preventDefault();
-            return;
-        }
+        if (card.classList.contains('subject-locked')) return;
 
         // Prevent text selection and native drag behaviors.
         e.preventDefault();
@@ -1372,7 +1791,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!subjectId || !sectionId || !termId) return;
 
         const defaultRoomId = getDefaultRoomId(subjectId);
-        const defaultTeacherId = getDefaultTeacherId(subjectId);
+        const defaultTeacherId = null;
         const duration = parseFloat(durationInput.value) || 1;
 
         draggedData = {
@@ -1381,8 +1800,7 @@ document.addEventListener('DOMContentLoaded', () => {
             term_id: termId,
             room_id: defaultRoomId,
             teacher_id: defaultTeacherId,
-            duration: duration,
-            source_card_key: card.dataset.cardKey || buildSubjectCardKey(subjectId, sectionId, termId)
+            duration: duration
         };
 
         renderConflictHeatmap(draggedData);
@@ -1554,6 +1972,439 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     }
 
+    function normalizeTimeValue(time) {
+        if (!time) return '';
+        const value = String(time);
+        return value.length >= 5 ? value.slice(0, 5) : value;
+    }
+
+    function formatTimeLabel(time) {
+        const value = normalizeTimeValue(time);
+        if (!value) return '';
+        const [hoursRaw, minutesRaw] = value.split(':').map(Number);
+        const period = hoursRaw >= 12 ? 'PM' : 'AM';
+        const hours12 = ((hoursRaw + 11) % 12) + 1;
+        return `${hours12}:${String(minutesRaw || 0).padStart(2, '0')} ${period}`;
+    }
+
+    function capitalizeLabel(value) {
+        if (!value) return '';
+        const text = String(value);
+        return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
+    function getScheduleColorClass(subjectId) {
+        if (!colorClasses || !colorClasses.length) {
+            return 'bg-indigo-200';
+        }
+        const index = subjectsData.findIndex((subject) => String(subject.id) === String(subjectId));
+        if (index < 0) return colorClasses[0];
+        return colorClasses[index % colorClasses.length];
+    }
+
+    function getSlotCountFromTimes(startTime, endTime) {
+        const duration = parseMinutes(endTime) - parseMinutes(startTime);
+        return Math.max(1, Math.round(duration / 60));
+    }
+
+    function normalizeSchedulePayload(schedule) {
+        if (!schedule) return null;
+        const normalized = { ...schedule };
+        normalized.id = schedule.id ?? schedule.schedule_id;
+        normalized.subject_id = schedule.subject_id ?? schedule.subject?.id;
+        normalized.section_id = schedule.section_id ?? schedule.section?.id;
+        normalized.room_id = schedule.room_id ?? schedule.room?.id;
+        normalized.teacher_id = schedule.teacher_id ?? schedule.teacher?.id ?? null;
+        normalized.term_id = schedule.term_id ?? schedule.term?.id ?? null;
+        normalized.day = String(schedule.day || '').toLowerCase();
+        normalized.time_start = normalizeTimeValue(schedule.time_start);
+        normalized.time_end = normalizeTimeValue(schedule.time_end);
+        normalized.is_published = !!schedule.is_published;
+        if (!normalized.slot_count && normalized.time_start && normalized.time_end) {
+            normalized.slot_count = getSlotCountFromTimes(normalized.time_start, normalized.time_end);
+        }
+        return normalized;
+    }
+
+    function findSubjectListItems(subjectId, sectionId) {
+        if (!subjectId || !sectionId) return [];
+        return Array.from(document.querySelectorAll(`.subject-draggable[data-subject-id="${subjectId}"][data-section-id="${sectionId}"]`));
+    }
+
+    function lockSubjectCard(card) {
+        if (!card) return;
+        card.classList.add('subject-locked');
+        card.setAttribute('aria-disabled', 'true');
+    }
+
+    function unlockSubjectCard(card) {
+        if (!card) return;
+        card.classList.remove('subject-locked');
+        card.removeAttribute('aria-disabled');
+    }
+
+    function updateSidebarAssignment(schedule, options = {}) {
+        const normalized = normalizeSchedulePayload(schedule);
+        if (!normalized) return;
+        const targets = findSubjectListItems(normalized.subject_id, normalized.section_id);
+        if (!targets.length) return;
+
+        targets.forEach((target) => {
+            const meta = target.querySelector('.subject-meta');
+            if (!meta) return;
+
+            if (options.clear) {
+                meta.textContent = '';
+                meta.classList.add('hidden');
+                unlockSubjectCard(target);
+                return;
+            }
+
+            const roomName = roomsMap.get(String(normalized.room_id))?.name || '';
+            const dayLabel = capitalizeLabel(normalized.day);
+            const timeLabel = normalized.time_start && normalized.time_end
+                ? `${formatTimeLabel(normalized.time_start)} - ${formatTimeLabel(normalized.time_end)}`
+                : '';
+            const parts = [roomName, dayLabel, timeLabel].filter(Boolean);
+
+            meta.textContent = parts.join(' · ');
+            meta.classList.remove('hidden');
+            lockSubjectCard(target);
+        });
+    }
+
+    function hydrateSidebarAssignments() {
+        schedulesData.forEach((schedule) => {
+            updateSidebarAssignment(schedule);
+        });
+    }
+
+    function getAssignedScheduleForSubject(subjectId, sectionId, termId) {
+        const matches = schedulesData.filter((schedule) =>
+            String(schedule.subject_id) === String(subjectId) &&
+            String(schedule.section_id) === String(sectionId) &&
+            String(schedule.term_id) === String(termId)
+        );
+        if (!matches.length) return null;
+        return matches[matches.length - 1];
+    }
+
+    function collectDraftSchedules() {
+        return schedulesData.map((schedule) => ({
+            teacher_id: schedule.teacher_id || null,
+            subject_id: schedule.subject_id,
+            section_id: schedule.section_id,
+            room_id: schedule.room_id,
+            term_id: schedule.term_id,
+            day: schedule.day,
+            time_start: schedule.time_start,
+            time_end: schedule.time_end,
+            slot_count: schedule.slot_count
+        }));
+    }
+
+    function getLocalConflicts(candidate, excludeId = null) {
+        const conflicts = {};
+        conflictSchedulePool.forEach((item) => {
+            if (excludeId && String(item.schedule_id) === String(excludeId)) {
+                return;
+            }
+            if (item.day !== candidate.day) {
+                return;
+            }
+            if (!overlaps(candidate.time_start, candidate.time_end, item.time_start, item.time_end)) {
+                return;
+            }
+
+            if (String(item.room_id) === String(candidate.room_id)) {
+                conflicts.room = 'Room is already booked at this time.';
+            }
+            if (String(item.section_id) === String(candidate.section_id)) {
+                conflicts.section = 'Section already has a class at this time.';
+            }
+            if (candidate.teacher_id && item.teacher_id && String(item.teacher_id) === String(candidate.teacher_id)) {
+                conflicts.teacher = 'Teacher is already scheduled at this time.';
+            }
+        });
+        return conflicts;
+    }
+
+    function upsertScheduleCache(schedule) {
+        const normalized = normalizeSchedulePayload(schedule);
+        if (!normalized) return;
+
+        const index = schedulesData.findIndex((item) => String(item.id) === String(normalized.id));
+        if (index >= 0) {
+            schedulesData[index] = {
+                id: normalized.id,
+                teacher_id: normalized.teacher_id,
+                subject_id: normalized.subject_id,
+                section_id: normalized.section_id,
+                room_id: normalized.room_id,
+                term_id: normalized.term_id,
+                day: normalized.day,
+                time_start: normalized.time_start,
+                time_end: normalized.time_end,
+                slot_count: normalized.slot_count,
+                is_published: normalized.is_published
+            };
+        } else {
+            schedulesData.push({
+                id: normalized.id,
+                teacher_id: normalized.teacher_id,
+                subject_id: normalized.subject_id,
+                section_id: normalized.section_id,
+                room_id: normalized.room_id,
+                term_id: normalized.term_id,
+                day: normalized.day,
+                time_start: normalized.time_start,
+                time_end: normalized.time_end,
+                slot_count: normalized.slot_count,
+                is_published: normalized.is_published
+            });
+        }
+
+        const conflictIndex = conflictSchedulePool.findIndex((item) => String(item.schedule_id) === String(normalized.id));
+        const conflictEntry = {
+            schedule_id: normalized.id,
+            teacher_id: normalized.teacher_id,
+            section_id: normalized.section_id,
+            room_id: normalized.room_id,
+            day: normalized.day,
+            time_start: normalized.time_start,
+            time_end: normalized.time_end
+        };
+        if (conflictIndex >= 0) {
+            conflictSchedulePool[conflictIndex] = conflictEntry;
+        } else {
+            conflictSchedulePool.push(conflictEntry);
+        }
+    }
+
+    function removeScheduleCache(scheduleId) {
+        const index = schedulesData.findIndex((item) => String(item.id) === String(scheduleId));
+        if (index >= 0) {
+            schedulesData.splice(index, 1);
+        }
+        const conflictIndex = conflictSchedulePool.findIndex((item) => String(item.schedule_id) === String(scheduleId));
+        if (conflictIndex >= 0) {
+            conflictSchedulePool.splice(conflictIndex, 1);
+        }
+    }
+
+    function removeScheduleItemInstances(scheduleId) {
+        document.querySelectorAll(`.schedule-item[data-schedule-id="${scheduleId}"]`).forEach((item) => {
+            item.remove();
+        });
+    }
+
+    function buildScheduleItemElement(schedule, slotCount) {
+        const subject = schedule.subject || subjectMap.get(String(schedule.subject_id));
+        const section = schedule.section || sectionsMap.get(String(schedule.section_id));
+        const room = schedule.room || roomsMap.get(String(schedule.room_id));
+        const subjectName = subject?.name || 'Subject';
+        const sectionName = section?.name || '';
+        const roomName = room?.name || '';
+        const teacherName = schedule.teacher_id
+            ? (teachersMap.get(String(schedule.teacher_id))?.name || '')
+            : '';
+        const colorClass = getScheduleColorClass(schedule.subject_id);
+        const sizeClass = slotCount <= 1 ? 'size-xs' : (slotCount <= 2 ? 'size-sm' : 'size-md');
+
+        const wrapper = document.createElement('div');
+        wrapper.className = `schedule-item absolute inset-0 m-0.5 ${colorClass} rounded border border-gray-400 dark:border-gray-600 cursor-move hover:shadow-md transition-shadow`;
+        wrapper.dataset.scheduleId = schedule.id;
+        wrapper.dataset.teacherId = schedule.teacher_id || '';
+        wrapper.dataset.subjectId = schedule.subject_id;
+        wrapper.dataset.sectionId = schedule.section_id;
+        wrapper.dataset.roomId = schedule.room_id;
+        wrapper.dataset.termId = schedule.term_id;
+        wrapper.dataset.day = schedule.day;
+        wrapper.dataset.timeStart = schedule.time_start;
+        wrapper.dataset.timeEnd = schedule.time_end;
+        wrapper.dataset.isPublished = schedule.is_published ? '1' : '0';
+        wrapper.dataset.slotCount = String(slotCount);
+        wrapper.style.height = `calc(${slotCount} * var(--timetable-slot-height) - 4px)`;
+        wrapper.style.zIndex = '10';
+        wrapper.draggable = true;
+
+        const badge = schedule.is_published
+            ? `<div class="mb-1"><span class="inline-flex items-center rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-semibold text-white">PUBLISHED</span></div>`
+            : '';
+
+        wrapper.innerHTML = `
+            <button type="button" class="delete-schedule-btn absolute top-1 right-1 h-5 w-5 rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] leading-none flex items-center justify-center shadow"
+                data-schedule-id="${schedule.id}" title="Remove schedule block" aria-label="Remove schedule block">
+                &times;
+            </button>
+            <div class="schedule-body ${sizeClass} h-full flex flex-col">
+                ${badge}
+                <div class="subject-line font-semibold text-gray-900 dark:text-white" title="${subjectName}">
+                    ${subjectName.length > 32 ? `${subjectName.slice(0, 32)}...` : subjectName}
+                </div>
+                <div class="meta-line text-gray-700 dark:text-gray-300">${sectionName}</div>
+                ${teacherName ? `<div class="meta-line text-gray-600 dark:text-gray-400">${teacherName}</div>` : ''}
+                <div class="meta-line text-gray-600 dark:text-gray-400">${roomName}</div>
+            </div>
+        `;
+
+        return wrapper;
+    }
+
+    function updateScheduleBodySize(scheduleItem, slotCount) {
+        const body = scheduleItem.querySelector('.schedule-body');
+        if (!body) return;
+        body.classList.remove('size-xs', 'size-sm', 'size-md');
+        const sizeClass = slotCount <= 1 ? 'size-xs' : (slotCount <= 2 ? 'size-sm' : 'size-md');
+        body.classList.add(sizeClass);
+    }
+
+    const scheduleResizeObserver = window.ResizeObserver ? new ResizeObserver((entries) => {
+        entries.forEach((entry) => {
+            const item = entry.target;
+            if (!item || !item.classList.contains('schedule-item')) return;
+            const height = entry.contentRect?.height || item.getBoundingClientRect().height;
+            const slots = getSlotCountFromHeight(height);
+            item.dataset.slotCount = String(slots);
+            updateScheduleBodySize(item, slots);
+        });
+    }) : null;
+
+    function observeScheduleItem(item) {
+        if (!scheduleResizeObserver || item._resizeObserved) return;
+        scheduleResizeObserver.observe(item);
+        item._resizeObserved = true;
+    }
+
+    function findTargetCell(schedule, viewType, overrideCell = null) {
+        if (overrideCell && viewType === 'room') {
+            return overrideCell;
+        }
+
+        if (viewType === 'room') {
+            return document.querySelector(`#view-room .drop-zone[data-room-id="${schedule.room_id}"][data-day="${schedule.day}"][data-time-start="${schedule.time_start}"]`);
+        }
+
+        if (viewType === 'teacher') {
+            if (!schedule.teacher_id) return null;
+            return document.querySelector(`#view-teacher .drop-zone[data-teacher-id="${schedule.teacher_id}"][data-day="${schedule.day}"][data-time-start="${schedule.time_start}"]`);
+        }
+
+        if (viewType === 'section') {
+            return document.querySelector(`#view-section .drop-zone[data-section-id="${schedule.section_id}"][data-day="${schedule.day}"][data-time-start="${schedule.time_start}"]`);
+        }
+
+        return null;
+    }
+
+    function insertScheduleIntoView(viewType, schedule, overrideCell = null) {
+        const cell = findTargetCell(schedule, viewType, overrideCell);
+        if (!cell) return;
+        const slotCount = (schedule.time_start && schedule.time_end)
+            ? getSlotCountFromTimes(schedule.time_start, schedule.time_end)
+            : Math.max(1, parseInt(schedule.slot_count || '1', 10));
+        const scheduleEl = buildScheduleItemElement(schedule, slotCount);
+        cell.appendChild(scheduleEl);
+        observeScheduleItem(scheduleEl);
+    }
+
+    function getCurrentScheduleSnapshots() {
+        return schedulesData.map((item) => ({
+            id: item.id,
+            teacher_id: item.teacher_id || null,
+            subject_id: item.subject_id,
+            section_id: item.section_id,
+            room_id: item.room_id,
+            term_id: item.term_id,
+            day: item.day,
+            time_start: item.time_start,
+            time_end: item.time_end,
+            slot_count: item.slot_count,
+            is_published: item.is_published
+        }));
+    }
+
+    function refreshSectionView() {
+        document.querySelectorAll('#view-section .schedule-item').forEach((item) => item.remove());
+        getCurrentScheduleSnapshots().forEach((schedule) => {
+            insertScheduleIntoView('section', schedule);
+        });
+        ensureResizeHandles();
+    }
+
+    function refreshTeacherView() {
+        document.querySelectorAll('#view-teacher .schedule-item').forEach((item) => item.remove());
+        getCurrentScheduleSnapshots().forEach((schedule) => {
+            if (schedule.teacher_id) {
+                insertScheduleIntoView('teacher', schedule);
+            }
+        });
+        updateTeacherVisibility();
+        ensureResizeHandles();
+    }
+
+    function updateTeacherVisibility() {
+        const teacherBlocks = document.querySelectorAll('#view-teacher .teacher-block');
+        const emptyState = document.getElementById('teacher-empty-state');
+        const visibleTeacherIds = new Set(
+            getCurrentScheduleSnapshots()
+                .map((s) => s.teacher_id)
+                .filter(Boolean)
+                .map((id) => String(id))
+        );
+
+        let shown = 0;
+        teacherBlocks.forEach((block) => {
+            const teacherId = block.dataset.teacherId;
+            if (teacherId && visibleTeacherIds.has(String(teacherId))) {
+                block.classList.remove('hidden');
+                shown += 1;
+            } else {
+                block.classList.add('hidden');
+            }
+        });
+
+        if (emptyState) {
+            emptyState.classList.toggle('hidden', shown > 0);
+        }
+    }
+
+    function applyDraftSchedulesToView(draftSchedules) {
+        if (!draftSchedules.length) return;
+        document.querySelectorAll('.schedule-item').forEach((item) => item.remove());
+        schedulesData.length = 0;
+        conflictSchedulePool.length = 0;
+
+        draftSchedules.forEach((draft) => {
+            const normalized = normalizeSchedulePayload(draft);
+            if (!normalized) return;
+            upsertScheduleCache(normalized);
+            insertScheduleIntoView('room', normalized);
+        });
+
+        refreshSectionView();
+        refreshTeacherView();
+        ensureResizeHandles();
+        hydrateSidebarAssignments();
+    }
+
+    function applyScheduleUpdate(schedule, overrideCell = null) {
+        const normalized = normalizeSchedulePayload(schedule);
+        if (!normalized) return;
+
+        upsertScheduleCache(normalized);
+        removeScheduleItemInstances(normalized.id);
+
+        const roomOverride = overrideCell && overrideCell.dataset && overrideCell.dataset.roomId ? overrideCell : null;
+        insertScheduleIntoView('room', normalized, roomOverride);
+        insertScheduleIntoView('teacher', normalized);
+        insertScheduleIntoView('section', normalized);
+
+        updateSidebarAssignment(normalized);
+        ensureResizeHandles();
+        saveDraftState();
+    }
+
     function overlaps(startA, endA, startB, endB) {
         return parseMinutes(startA) < parseMinutes(endB) && parseMinutes(endA) > parseMinutes(startB);
     }
@@ -1569,7 +2420,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!placementData) return;
 
         const slotCount = getPlacementSlotCount(placementData);
-        const durationMinutes = slotCount * 30;
+        const durationMinutes = slotCount * 60;
 
         document.querySelectorAll('.drop-zone').forEach((cell) => {
             const day = cell.dataset.day;
@@ -1587,7 +2438,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     return false;
                 }
 
-                return String(item.room_id) === String(placementData.room_id);
+                return (
+                    (placementData.teacher_id && item.teacher_id && String(item.teacher_id) === String(placementData.teacher_id)) ||
+                    String(item.section_id) === String(placementData.section_id) ||
+                    String(item.room_id) === String(placementData.room_id)
+                );
             });
 
             if (isConflict) {
@@ -1601,11 +2456,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const [startHours, startMinutes] = placementData.time_start.split(':').map(Number);
             const [endHours, endMinutes] = placementData.time_end.split(':').map(Number);
             const durationMinutes = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
-            return Math.max(1, Math.round(durationMinutes / 30));
+            return Math.max(1, Math.round(durationMinutes / 60));
         }
 
         const duration = parseFloat(placementData.duration || '1');
-        return Math.max(1, Math.round(duration * 2));
+        return Math.max(1, Math.round(duration));
     }
 
     function showDragShadow(cell, placementData) {
@@ -1616,7 +2471,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const shadow = document.createElement('div');
         // Match the real schedule item footprint for exact visual alignment while dragging.
         shadow.className = 'absolute inset-0 m-0.5 rounded border border-indigo-400 bg-indigo-200/45 dark:bg-indigo-700/35 pointer-events-none';
-        shadow.style.height = `calc(${slotCount} * 60px - 4px)`;
+        shadow.style.height = `calc(${slotCount} * ${SLOT_HEIGHT}px - 4px)`;
         shadow.style.zIndex = '10';
         shadow.style.boxShadow = '0 10px 18px rgba(79, 70, 229, 0.25)';
         cell.appendChild(shadow);
@@ -1642,7 +2497,19 @@ document.addEventListener('DOMContentLoaded', () => {
     markCardAsPending();
     setClickPlaceMode(false);
     initSubjectDragHandlers();
+    hydrateSidebarAssignments();
     console.debug('initSubjectDragHandlers attached to', document.querySelectorAll('.subject-draggable').length, 'items');
+
+    const savedView = localStorage.getItem(storageKeyView);
+    setTimetableView(savedView || 'room');
+    timetableTabs.forEach((tab) => {
+        tab.addEventListener('click', () => setTimetableView(tab.dataset.view));
+    });
+
+    const draftSchedules = loadDraftState();
+    if (draftSchedules.length) {
+        applyDraftSchedulesToView(draftSchedules);
+    }
 
     if (curriculumSelect) {
         curriculumSelect.addEventListener('change', () => {
@@ -1684,6 +2551,88 @@ document.addEventListener('DOMContentLoaded', () => {
         markCardAsPending();
     });
 
+    teacherModalClose?.addEventListener('click', closeTeacherModal);
+    teacherModalCancel?.addEventListener('click', closeTeacherModal);
+    teacherModal?.addEventListener('click', (e) => {
+        if (e.target === teacherModal) {
+            closeTeacherModal();
+        }
+    });
+    teacherModalSave?.addEventListener('click', async () => {
+        if (!activeScheduleForTeacher) {
+            closeTeacherModal();
+            return;
+        }
+
+        const scheduleItem = activeScheduleForTeacher;
+        const scheduleId = scheduleItem.dataset.scheduleId;
+        const newTeacherId = teacherModalSelect.value || null;
+
+        const payload = {
+            id: scheduleId,
+            schedule_id: scheduleId,
+            teacher_id: newTeacherId,
+            subject_id: scheduleItem.dataset.subjectId,
+            section_id: scheduleItem.dataset.sectionId,
+            room_id: scheduleItem.dataset.roomId,
+            term_id: scheduleItem.dataset.termId,
+            day: scheduleItem.dataset.day,
+            time_start: scheduleItem.dataset.timeStart,
+            time_end: scheduleItem.dataset.timeEnd,
+            is_published: scheduleItem.dataset.isPublished === '1'
+        };
+
+        if (!autosaveEnabled) {
+            const conflicts = getLocalConflicts(payload, scheduleId);
+            if (Object.keys(conflicts).length) {
+                showConflictPopup(conflicts);
+                return;
+            }
+            applyScheduleUpdate(payload);
+            saveDraftState();
+            closeTeacherModal();
+            return;
+        }
+
+        try {
+            const updateUrl = endpoints.updateTemplate.replace('__SCHEDULE_ID__', scheduleId);
+            const response = await fetch(updateUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    _method: 'PUT',
+                    teacher_id: newTeacherId,
+                    subject_id: payload.subject_id,
+                    section_id: payload.section_id,
+                    room_id: payload.room_id,
+                    term_id: payload.term_id,
+                    day: payload.day,
+                    time_start: payload.time_start,
+                    time_end: payload.time_end
+                })
+            });
+
+            const result = await response.json();
+            if (!response.ok || result.success === false) {
+                const message = result.message || 'Failed to update teacher.';
+                alert(message);
+                return;
+            }
+
+            if (result.schedule) {
+                applyScheduleUpdate(result.schedule);
+            }
+            closeTeacherModal();
+        } catch (error) {
+            alert('Unable to update teacher: ' + (error.message || 'Unknown error'));
+        }
+    });
+
     // Quick duration presets
     document.querySelectorAll('.duration-preset').forEach((button) => {
         button.addEventListener('click', () => {
@@ -1702,12 +2651,64 @@ document.addEventListener('DOMContentLoaded', () => {
         setCardReady();
     });
 
-    publishWeekBtn.addEventListener('click', async () => {
+    saveScheduleBtn?.addEventListener('click', async () => {
         const termId = termInput.value || termFilter?.value;
         const curriculumId = curriculumSelect ? (curriculumSelect.value || null) : null;
 
-        if (!termId) {
-            alert('Select a curriculum with a term first.');
+        const draftSchedules = collectDraftSchedules();
+        if (!draftSchedules.length) {
+            alert('No schedules to save yet.');
+            return;
+        }
+        const resolvedTermId = termId || draftSchedules[0]?.term_id;
+
+        try {
+            saveScheduleBtn.disabled = true;
+            saveScheduleBtn.textContent = 'Saving...';
+
+            const response = await fetch(endpoints.saveDraft, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    term_id: resolvedTermId,
+                    curriculum_id: curriculumId,
+                    schedule_name: initialScheduleName || null,
+                    selected_rooms: initialSelectedRooms,
+                    draft_schedules: draftSchedules
+                })
+            });
+
+            const result = await response.json();
+            if (!response.ok || result.success === false) {
+                const message = result.message || 'Failed to save schedule.';
+                alert(message);
+                return;
+            }
+
+            alert(result.message || 'Schedule saved successfully.');
+            localStorage.removeItem(getDraftStorageKey());
+            window.location.href = '{{ route("admin.schedules.index") }}';
+        } catch (error) {
+            alert('Unable to save schedule: ' + (error.message || 'Unknown error'));
+        } finally {
+            saveScheduleBtn.disabled = false;
+            saveScheduleBtn.textContent = 'Save Schedule';
+        }
+    });
+
+    publishWeekBtn.addEventListener('click', async () => {
+        const termId = termInput.value || termFilter?.value;
+        const curriculumId = curriculumSelect ? (curriculumSelect.value || null) : null;
+        const draftSchedules = collectDraftSchedules();
+        const resolvedTermId = termId || draftSchedules[0]?.term_id;
+
+        if (!autosaveEnabled && draftSchedules.length === 0) {
+            alert('No schedules to publish yet.');
             return;
         }
 
@@ -1728,9 +2729,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json'
                 },
-                body: JSON.stringify({
-                    term_id: termId,
+                body: JSON.stringify(autosaveEnabled ? {
+                    term_id: resolvedTermId,
                     curriculum_id: curriculumId
+                } : {
+                    term_id: resolvedTermId,
+                    curriculum_id: curriculumId,
+                    schedule_name: initialScheduleName || null,
+                    selected_rooms: initialSelectedRooms,
+                    draft_schedules: draftSchedules
                 })
             });
 
@@ -1743,6 +2750,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             alert(result.message || 'Week timetable published successfully.');
+            localStorage.removeItem(getDraftStorageKey());
             window.location.reload();
         } catch (error) {
             alert('Unable to publish timetable: ' + (error.message || 'Unknown error'));
@@ -1824,12 +2832,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const dragTimeStart = scheduleItem.dataset.timeStart;
-            const dragSlotCount = getSlotCountFromHeight(scheduleItem.getBoundingClientRect().height);
-            const dragTimeEnd = dragTimeStart
-                ? getEndTimeFromStartAndSlots(dragTimeStart, dragSlotCount)
-                : scheduleItem.dataset.timeEnd;
-
             draggedData = {
                 schedule_id: scheduleItem.dataset.scheduleId,
                 teacher_id: scheduleItem.dataset.teacherId,
@@ -1838,8 +2840,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 room_id: scheduleItem.dataset.roomId,
                 term_id: scheduleItem.dataset.termId,
                 day: scheduleItem.dataset.day,
-                time_start: dragTimeStart,
-                time_end: dragTimeEnd
+                time_start: scheduleItem.dataset.timeStart,
+                time_end: scheduleItem.dataset.timeEnd,
+                slot_count: scheduleItem.dataset.slotCount
             };
             renderConflictHeatmap(draggedData);
 
@@ -1859,7 +2862,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const subjectCard = e.target.closest('.subject-draggable');
         if (subjectCard) {
-            if (subjectCard.dataset.locked === '1') {
+            if (subjectCard.classList.contains('subject-locked')) {
                 e.preventDefault();
                 return;
             }
@@ -1875,7 +2878,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const defaultRoomId = getDefaultRoomId(subjectId);
-            const defaultTeacherId = getDefaultTeacherId(subjectId);
+        const defaultTeacherId = null;
             const duration = parseFloat(durationInput.value) || 1;
 
             draggedData = {
@@ -1884,8 +2887,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 term_id: termId,
                 room_id: defaultRoomId,
                 teacher_id: defaultTeacherId,
-                duration: duration,
-                source_card_key: subjectCard.dataset.cardKey || buildSubjectCardKey(subjectId, sectionId, termId)
+                duration: duration
             };
 
             renderConflictHeatmap(draggedData);
@@ -2017,10 +3019,17 @@ document.addEventListener('DOMContentLoaded', () => {
     async function placeScheduleInCell(cell, placementData) {
         const day = cell.dataset.day;
         const timeStart = cell.dataset.timeStart;
-        const roomId = cell.dataset.roomId;
+        const roomId = cell.dataset.roomId || placementData.room_id;
 
         let timeEnd;
-        if (placementData.schedule_id && placementData.time_end) {
+        if (placementData.schedule_id && placementData.slot_count) {
+            const durationMinutes = parseInt(placementData.slot_count, 10) * 60;
+            const [newStartHours, newStartMinutes] = timeStart.split(':').map(Number);
+            const newEndMinutes = newStartMinutes + durationMinutes;
+            const finalHours = newStartHours + Math.floor(newEndMinutes / 60);
+            const finalMinutes = newEndMinutes % 60;
+            timeEnd = `${String(finalHours).padStart(2, '0')}:${String(finalMinutes).padStart(2, '0')}`;
+        } else if (placementData.schedule_id && placementData.time_end) {
             const [startHours, startMinutes] = placementData.time_start.split(':').map(Number);
             const [endHours, endMinutes] = placementData.time_end.split(':').map(Number);
             const durationMinutes = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
@@ -2040,9 +3049,53 @@ document.addEventListener('DOMContentLoaded', () => {
             timeEnd = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
         }
 
+        const slotCount = getSlotCountFromTimes(timeStart, timeEnd);
         const isUpdate = placementData.schedule_id && placementData.schedule_id !== 'undefined' && placementData.schedule_id !== '';
-        if (isUpdate && placementData.day === day && placementData.time_start === timeStart && placementData.time_end === timeEnd) {
+        if (isUpdate) {
+            const cached = schedulesData.find((item) => String(item.id) === String(placementData.schedule_id));
+            if (cached &&
+                cached.day === day &&
+                cached.time_start === timeStart &&
+                cached.time_end === timeEnd &&
+                String(cached.room_id) === String(roomId) &&
+                String(cached.section_id) === String(placementData.section_id) &&
+                String(cached.subject_id) === String(placementData.subject_id) &&
+                String(cached.teacher_id || '') === String(placementData.teacher_id || '')) {
+                return;
+            }
+        }
+
+        const subject = subjectMap.get(String(placementData.subject_id));
+        const room = roomsData.find((item) => String(item.id) === String(roomId));
+        if (!isRoomCompatible(subject, room)) {
+            showConflictPopup({ room_type: 'Selected room type is not compatible with this subject.' });
             return;
+        }
+
+        if (!autosaveEnabled) {
+            const draftId = placementData.schedule_id || placementData.draft_id || `draft-${Date.now()}-${draftIdCounter++}`;
+            const draftSchedule = {
+                id: draftId,
+                teacher_id: placementData.teacher_id || null,
+                subject_id: placementData.subject_id,
+                section_id: placementData.section_id,
+                room_id: roomId,
+                term_id: placementData.term_id,
+                day: day,
+                time_start: timeStart,
+                time_end: timeEnd,
+                slot_count: slotCount,
+                is_published: false
+            };
+
+            const conflicts = getLocalConflicts(draftSchedule, placementData.schedule_id || placementData.draft_id || null);
+            if (Object.keys(conflicts).length) {
+                showConflictPopup(conflicts);
+                return null;
+            }
+
+            applyScheduleUpdate(draftSchedule, cell);
+            return draftSchedule;
         }
 
         const conflictData = {
@@ -2101,16 +3154,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            let saveData = {
-                teacher_id: placementData.teacher_id || null,
-                subject_id: placementData.subject_id,
-                section_id: placementData.section_id,
-                room_id: roomId,
-                term_id: placementData.term_id,
-                day: day,
-                time_start: timeStart,
-                time_end: timeEnd
-            };
+        const resolvedTeacherId = isUpdate ? (placementData.teacher_id || null) : null;
+        let saveData = {
+            teacher_id: resolvedTeacherId,
+            subject_id: placementData.subject_id,
+            section_id: placementData.section_id,
+            room_id: roomId,
+            term_id: placementData.term_id,
+            day: day,
+            time_start: timeStart,
+            time_end: timeEnd
+        };
 
             if (placementData.curriculum_id) {
                 saveData.curriculum_id = placementData.curriculum_id;
@@ -2170,9 +3224,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (result.success !== false) {
-                if (placementData.source_card_key) {
-                    lockSubjectCardByKey(placementData.source_card_key);
-                }
                 if (!isUpdate) {
                     lastScheduleDraft = {
                         teacher_id: saveData.teacher_id,
@@ -2185,10 +3236,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
                     reuseLastBtn.disabled = false;
                 }
-                window.location.reload();
+
+                if (result.schedule) {
+                    applyScheduleUpdate(result.schedule, cell);
+                }
+                return result.schedule || null;
             } else {
                 const errorMsg = result.message || result.errors || 'Failed to save schedule';
                 alert('Error: ' + (typeof errorMsg === 'object' ? JSON.stringify(errorMsg) : errorMsg));
+                return null;
             }
         } catch (error) {
             console.error('Exception caught:', error);
@@ -2198,18 +3254,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? 'Request could not reach the server. Please refresh and make sure you are using the same app URL/host.'
                 : 'You appear to be offline. Check your network and try again.';
             alert('An error occurred while saving the schedule: ' + (error.message || 'Unknown error') + '. ' + hint);
+            return null;
         }
     }
 
     function getSlotCountFromHeight(heightPx) {
-        // Each slot is 60px tall; schedule items use height calc(slotCount * 60px - 4px).
-        const normalized = Math.max(1, Math.round((heightPx + 4) / 60));
+        // Each slot is SLOT_HEIGHT px tall; schedule items use height calc(slotCount * SLOT_HEIGHT - 4px).
+        const normalized = Math.max(1, Math.round((heightPx + 4) / SLOT_HEIGHT));
         return normalized;
     }
 
     function getEndTimeFromStartAndSlots(startTime, slotCount) {
         const startMinutes = parseMinutes(startTime);
-        const endMinutes = startMinutes + slotCount * 30;
+        const endMinutes = startMinutes + slotCount * 60;
         return formatMinutes(endMinutes);
     }
 
@@ -2232,7 +3289,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Provide conflict preview while resizing.
         renderConflictHeatmap(placementData);
 
-        await placeScheduleInCell(cell, placementData);
+        const result = await placeScheduleInCell(cell, placementData);
+        if (!result) {
+            updateSidebarAssignment(getScheduleDataFromItem(scheduleItem));
+        }
     }
 
     function ensureResizeHandles() {
@@ -2242,6 +3302,9 @@ document.addEventListener('DOMContentLoaded', () => {
             handle.className = 'resize-handle absolute bottom-0 left-0 right-0 h-2 cursor-s-resize bg-transparent hover:bg-indigo-200/40';
             handle.title = 'Drag to adjust duration';
             item.appendChild(handle);
+            observeScheduleItem(item);
+            const slots = parseInt(item.dataset.slotCount || '0', 10) || getSlotCountFromHeight(item.getBoundingClientRect().height);
+            updateScheduleBodySize(item, slots);
         });
     }
 
@@ -2256,10 +3319,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!scheduleItem) return;
 
         resizingScheduleItem = scheduleItem;
+        resizeWasDraggable = scheduleItem.draggable;
+        scheduleItem.draggable = false;
         resizeStartY = e.pageY;
         resizeOriginalHeight = scheduleItem.getBoundingClientRect().height;
         resizeStartHeight = resizeOriginalHeight;
         resizeStartSlots = getSlotCountFromHeight(resizeOriginalHeight);
+        resizeOriginalEndTime = scheduleItem.dataset.timeEnd;
 
         document.body.style.userSelect = 'none';
         document.addEventListener('pointermove', handleScheduleResizeMove, { passive: false });
@@ -2274,13 +3340,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const deltaY = e.pageY - resizeStartY;
         const rawHeight = resizeStartHeight + deltaY;
         const newSlots = Math.max(1, getSlotCountFromHeight(rawHeight));
-        const newHeight = Math.max(60, newSlots * 60 - 4);
+        const newHeight = Math.max(SLOT_HEIGHT, newSlots * SLOT_HEIGHT - 4);
 
         resizingScheduleItem.style.height = `${newHeight}px`;
+        resizingScheduleItem.dataset.slotCount = String(newSlots);
+        updateScheduleBodySize(resizingScheduleItem, newSlots);
 
         const newEndTime = getEndTimeFromStartAndSlots(resizingScheduleItem.dataset.timeStart, newSlots);
+        resizingScheduleItem.dataset.timeEnd = newEndTime;
         renderConflictHeatmap({
             ...getScheduleDataFromItem(resizingScheduleItem),
+            time_end: newEndTime
+        });
+
+        updateSidebarAssignment({
+            subject_id: resizingScheduleItem.dataset.subjectId,
+            section_id: resizingScheduleItem.dataset.sectionId,
+            room_id: resizingScheduleItem.dataset.roomId,
+            day: resizingScheduleItem.dataset.day,
+            time_start: resizingScheduleItem.dataset.timeStart,
             time_end: newEndTime
         });
     }
@@ -2292,11 +3370,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const finalSlots = getSlotCountFromHeight(finalHeight);
         const finalEndTime = getEndTimeFromStartAndSlots(resizingScheduleItem.dataset.timeStart, finalSlots);
 
-        resizingScheduleItem.dataset.timeEnd = finalEndTime;
+        const result = await resizeScheduleItem(resizingScheduleItem, finalEndTime);
+        if (!result && resizeOriginalEndTime) {
+            resizingScheduleItem.dataset.timeEnd = resizeOriginalEndTime;
+        }
+        if (result) {
+            refreshSectionView();
+            refreshTeacherView();
+        }
 
-        await resizeScheduleItem(resizingScheduleItem, finalEndTime);
-
+        if (resizeWasDraggable !== null) {
+            resizingScheduleItem.draggable = resizeWasDraggable;
+        }
         resizingScheduleItem = null;
+        resizeWasDraggable = null;
+        resizeOriginalEndTime = null;
+        clearConflictHeatmap();
+        saveDraftState();
         document.body.style.userSelect = '';
         document.removeEventListener('pointermove', handleScheduleResizeMove);
         document.removeEventListener('pointerup', handleScheduleResizeEnd);
@@ -2313,7 +3403,8 @@ document.addEventListener('DOMContentLoaded', () => {
             term_id: item.dataset.termId,
             day: item.dataset.day,
             time_start: item.dataset.timeStart,
-            time_end: item.dataset.timeEnd
+            time_end: item.dataset.timeEnd,
+            slot_count: item.dataset.slotCount
         };
     }
 
@@ -2408,11 +3499,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const scheduleId = deleteBtn.dataset.scheduleId;
             if (!scheduleId) return;
+            const scheduleItem = deleteBtn.closest('.schedule-item');
+            const subjectId = scheduleItem?.dataset.subjectId;
+            const sectionId = scheduleItem?.dataset.sectionId;
 
             const confirmed = confirm('Remove this schedule block?');
             if (!confirmed) return;
 
             try {
+                if (!autosaveEnabled) {
+                    removeScheduleItemInstances(scheduleId);
+                    removeScheduleCache(scheduleId);
+                    if (subjectId && sectionId) {
+                        updateSidebarAssignment({ subject_id: subjectId, section_id: sectionId }, { clear: true });
+                    }
+                    saveDraftState();
+                    return;
+                }
+
                 const deleteUrl = endpoints.destroyTemplate.replace('__SCHEDULE_ID__', scheduleId);
                 const response = await fetch(deleteUrl, {
                     method: 'POST',
@@ -2437,10 +3541,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                window.location.reload();
+                removeScheduleItemInstances(scheduleId);
+                removeScheduleCache(scheduleId);
+                if (subjectId && sectionId) {
+                    updateSidebarAssignment({ subject_id: subjectId, section_id: sectionId }, { clear: true });
+                }
             } catch (error) {
                 alert('Unable to remove schedule block: ' + (error.message || 'Unknown error'));
             }
+            return;
+        }
+
+        const scheduleCard = e.target.closest('.schedule-item');
+        if (scheduleCard) {
+            e.preventDefault();
+            e.stopPropagation();
+            openTeacherModal(scheduleCard);
             return;
         }
 
@@ -2459,3 +3575,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 @endsection
+

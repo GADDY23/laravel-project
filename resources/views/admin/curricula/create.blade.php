@@ -129,17 +129,48 @@ function updateGeneratedCode() {
     generatedCodeEl.textContent = `${year}-${type}-${strand}-${currType}`;
 }
 
+function getSelectedSubjectIds(excludeRow = null) {
+    const selected = new Set();
+    document.querySelectorAll('#year-period-container .subject-id').forEach((input) => {
+        if (excludeRow && excludeRow.contains(input)) return;
+        if (input.value) {
+            selected.add(String(input.value));
+        }
+    });
+    return selected;
+}
+
+function refreshSubjectPickers() {
+    document.querySelectorAll('#year-period-container tr').forEach((row) => {
+        const datalist = row.querySelector('.subject-datalist');
+        const hidden = row.querySelector('.subject-id');
+        if (!datalist || !hidden) return;
+
+        const excluded = getSelectedSubjectIds(row);
+        datalist.innerHTML = '';
+        subjectOptions.forEach((option) => {
+            const id = String(option.dataset.id || '');
+            if (!id) return;
+            if (excluded.has(id)) return;
+            const opt = document.createElement('option');
+            opt.value = option.value;
+            datalist.appendChild(opt);
+        });
+    });
+}
+
 let subjectRowCounter = 0;
 
 function createSubjectRow(yearKey, periodNumber, periodLabelText, preset = null) {
     const rowId = ++subjectRowCounter;
-    const prereqDatalistId = `prereq-lookup-${rowId}`;
+    const subjectDatalistId = `subject-lookup-${rowId}`;
 
     const row = document.createElement('tr');
     row.className = 'divide-x divide-gray-200';
     row.innerHTML = `
         <td class="px-2 py-2">
-            <input type="text" list="subject-lookup" class="subject-picker w-full rounded border-gray-300" placeholder="Subject code or name">
+            <input type="text" list="${subjectDatalistId}" class="subject-picker w-full rounded border-gray-300" placeholder="Subject code or name">
+            <datalist id="${subjectDatalistId}" class="subject-datalist"></datalist>
             <input type="hidden" name="row_subject_ids[]" class="subject-id" value="${preset?.subject_id || ''}">
             <input type="hidden" name="row_year_levels[]" value="${yearKey}">
             <input type="hidden" name="row_period_numbers[]" value="${periodNumber}">
@@ -149,8 +180,9 @@ function createSubjectRow(yearKey, periodNumber, periodLabelText, preset = null)
             <input type="text" class="subject-description w-full rounded border-gray-300 bg-gray-100" readonly>
         </td>
         <td class="px-2 py-2">
-            <input type="text" name="row_prerequisites[]" value="${preset?.prerequisite || ''}" class="prerequisite-input w-full rounded border-gray-300" placeholder="Prerequisite (optional)" list="${prereqDatalistId}">
-            <datalist id="${prereqDatalistId}"></datalist>
+            <select name="row_prerequisites[]" class="prerequisite-select w-full rounded border-gray-300">
+                <option value="">Select prerequisite (optional)</option>
+            </select>
         </td>
         <td class="px-2 py-2">
             <button type="button" class="remove-row bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded">Delete</button>
@@ -160,8 +192,8 @@ function createSubjectRow(yearKey, periodNumber, periodLabelText, preset = null)
     const picker = row.querySelector('.subject-picker');
     const hidden = row.querySelector('.subject-id');
     const description = row.querySelector('.subject-description');
-    const prereqInput = row.querySelector('.prerequisite-input');
-    const prereqDatalist = row.querySelector('datalist');
+    const prereqSelect = row.querySelector('.prerequisite-select');
+    const subjectDatalist = row.querySelector('.subject-datalist');
 
     function formatSubjectOption(option) {
         const code = option.dataset.code !== 'N/A' ? option.dataset.code : option.dataset.name;
@@ -170,62 +202,62 @@ function createSubjectRow(yearKey, periodNumber, periodLabelText, preset = null)
         return { value: label, label };
     }
 
-    function getSubjectCode(subjectId) {
-        const opt = subjectOptions.find((option) => option.dataset.id === String(subjectId));
-        if (!opt) return '';
-        return opt.dataset.code !== 'N/A' ? opt.dataset.code : opt.dataset.name;
-    }
-
-    function getSubjectName(subjectId) {
-        const opt = subjectOptions.find((option) => option.dataset.id === String(subjectId));
-        return opt ? (opt.dataset.name || '') : '';
-    }
-
-    function suggestPrerequisiteCode(subjectCode, subjectName) {
-        const match = String(subjectCode).match(/^([A-Za-z]+)(\d+)$/);
-        if (!match) return '';
-        const prefix = match[1];
-        const num = parseInt(match[2], 10);
-        if (isNaN(num) || num <= 1) return '';
-        const width = match[2].length;
-        const prevCode = `${prefix}${String(num - 1).padStart(width, '0')}`;
-        return subjectName ? `${prevCode} - ${subjectName}` : prevCode;
-    }
-
     function setPrerequisiteOptions(subjectId) {
         const subjectOpt = subjectOptions.find((option) => option.dataset.id === String(subjectId));
-        if (!subjectOpt) {
-            prereqDatalist.innerHTML = '';
-            prereqInput.placeholder = 'Prerequisite (optional)';
-            return;
-        }
+        const options = subjectOpt
+            ? subjectOptions.filter((option) => String(option.dataset.id) !== String(subjectId))
+            : subjectOptions.slice();
 
-        const label = formatSubjectOption(subjectOpt).label;
-        prereqDatalist.innerHTML = `<option value="${label}"></option>`;
-        prereqInput.placeholder = `Prerequisite (suggested: ${label})`;
+        prereqSelect.innerHTML = '<option value="">Select prerequisite (optional)</option>';
+        options.forEach((option) => {
+            const opt = document.createElement('option');
+            opt.value = formatSubjectOption(option).label;
+            opt.textContent = formatSubjectOption(option).label;
+            prereqSelect.appendChild(opt);
+        });
+
+        if (!options.length) {
+            prereqSelect.innerHTML = '<option value="">No other subjects available</option>';
+        }
     }
 
     function syncSubject() {
-        const match = subjectOptions.find((option) => option.value === picker.value || option.dataset.name === picker.value);
+        const match = subjectOptions.find((option) => (
+            option.value === picker.value ||
+            option.dataset.name === picker.value ||
+            formatSubjectOption(option).label === picker.value
+        ));
         if (!match) {
             hidden.value = '';
             description.value = '';
             setPrerequisiteOptions(null);
+            refreshSubjectPickers();
             return;
         }
+
+        const selectedElsewhere = getSelectedSubjectIds(row).has(String(match.dataset.id));
+        if (selectedElsewhere) {
+            alert('This subject is already selected in another year. Please choose a different subject.');
+            picker.value = '';
+            hidden.value = '';
+            description.value = '';
+            setPrerequisiteOptions(null);
+            refreshSubjectPickers();
+            return;
+        }
+
         hidden.value = match.dataset.id;
         description.value = match.dataset.description || match.dataset.name || '';
         picker.value = match.dataset.code !== 'N/A' ? match.dataset.code : match.dataset.name;
         setPrerequisiteOptions(match.dataset.id);
-
-        // Default prerequisite to the current subject (code + name)
-        // (always update so it stays in sync when the selected subject changes)
-        const label = formatSubjectOption(match).label;
-        prereqInput.value = label;
+        refreshSubjectPickers();
     }
 
     picker.addEventListener('input', syncSubject);
-    row.querySelector('.remove-row').addEventListener('click', () => row.remove());
+    row.querySelector('.remove-row').addEventListener('click', () => {
+        row.remove();
+        refreshSubjectPickers();
+    });
 
     if (preset?.subject_id) {
         const selected = subjectOptions.find((option) => option.dataset.id === String(preset.subject_id));
@@ -233,11 +265,15 @@ function createSubjectRow(yearKey, periodNumber, periodLabelText, preset = null)
             picker.value = selected.dataset.code !== 'N/A' ? selected.dataset.code : selected.dataset.name;
             description.value = selected.dataset.description || selected.dataset.name || '';
             setPrerequisiteOptions(String(preset.subject_id));
+            if (preset?.prerequisite) {
+                prereqSelect.value = preset.prerequisite;
+            }
         }
     } else {
         setPrerequisiteOptions(null);
     }
 
+    refreshSubjectPickers();
     return row;
 }
 
@@ -276,6 +312,7 @@ function renderYearPeriodBlocks() {
 
             addBtn.addEventListener('click', () => {
                 tbody.appendChild(createSubjectRow(year.key, p, pLabel));
+                refreshSubjectPickers();
             });
 
             const blockRows = oldRows.filter((r) => r.year_level === year.key && Number(r.period_number) === p);
@@ -288,6 +325,7 @@ function renderYearPeriodBlocks() {
             yearPeriodContainer.appendChild(block);
         }
     });
+    refreshSubjectPickers();
 }
 
 courseTypeEl.addEventListener('change', () => {

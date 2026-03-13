@@ -2525,6 +2525,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderConflictHeatmap(placementData) {
         clearConflictHeatmap();
         if (!placementData) return;
+        if (!placementData.room_id) return;
 
         const slotCount = getPlacementSlotCount(placementData);
         const durationMinutes = slotCount * 60;
@@ -3135,7 +3136,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function placeScheduleInCell(cell, placementData) {
         const day = cell.dataset.day;
         const timeStart = cell.dataset.timeStart;
-        const roomId = cell.dataset.roomId || placementData.room_id || null;
+        let roomId = cell.dataset.roomId || placementData.room_id || null;
 
         let timeEnd;
         if (placementData.schedule_id && placementData.slot_count) {
@@ -3199,7 +3200,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const subject = subjectMap.get(String(placementData.subject_id));
         const room = roomsData.find((item) => String(item.id) === String(roomId));
-        if (!isRoomCompatible(subject, room)) {
+        if (roomId && !room) {
+            roomId = null;
+        }
+        if (roomId && room && !isRoomCompatible(subject, room)) {
             showConflictPopup({ room_type: 'Selected room type is not compatible with this subject.' });
             return;
         }

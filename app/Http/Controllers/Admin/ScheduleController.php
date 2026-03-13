@@ -570,7 +570,7 @@ class ScheduleController extends Controller
                 'draft_schedules.*.teacher_id' => ['nullable', Rule::exists('users', 'id')->where(fn($q) => $q->where('role', 'teacher')->where('account_status', 'active'))],
                 'draft_schedules.*.subject_id' => ['required', Rule::exists('subjects', 'id')->where('status', 'active')],
                 'draft_schedules.*.section_id' => ['required', Rule::exists('sections', 'id')->where('status', 'active')],
-                'draft_schedules.*.room_id' => ['required', Rule::exists('rooms', 'id')->where('status', 'available')],
+                'draft_schedules.*.room_id' => ['nullable', Rule::exists('rooms', 'id')->where('status', 'available')],
                 'draft_schedules.*.term_id' => ['required', 'integer'],
                 'draft_schedules.*.day' => ['required', 'in:monday,tuesday,wednesday,thursday,friday,saturday,sunday'],
                 'draft_schedules.*.time_start' => ['required', 'date_format:H:i'],
@@ -619,6 +619,9 @@ class ScheduleController extends Controller
 
             $roomDayBuckets = [];
             foreach ($draftSchedules as $draft) {
+                if (empty($draft['room_id'])) {
+                    continue;
+                }
                 $bucketKey = $draft['room_id'] . '|' . $draft['day'];
                 $roomDayBuckets[$bucketKey][] = $draft;
             }

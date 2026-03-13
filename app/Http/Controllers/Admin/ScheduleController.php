@@ -24,8 +24,8 @@ class ScheduleController extends Controller
         $hasScheduleName = Schema::hasColumn('schedules', 'schedule_name');
 
         $query = Schedule::query()
-            ->when($hasScheduleName, fn($q) => $q->select('schedule_name'))
             ->select('term_id')
+            ->when($hasScheduleName, fn($q) => $q->addSelect('schedule_name'))
             ->selectRaw('GROUP_CONCAT(DISTINCT rooms.name ORDER BY rooms.name SEPARATOR \', \') as room_names')
             ->selectRaw('GROUP_CONCAT(DISTINCT rooms.id ORDER BY rooms.id SEPARATOR \',\') as room_ids')
             ->selectRaw('COUNT(DISTINCT rooms.id) as room_count')
@@ -244,14 +244,25 @@ class ScheduleController extends Controller
         if (array_key_exists('schedule_name', $validated)) {
             $scheduleName = $validated['schedule_name'];
             if (is_null($scheduleName) || $scheduleName === '') {
-                $query->whereNull('schedule_name');
+                $query->where(function ($q) {
+                    $q->whereNull('schedule_name')
+                        ->orWhere('schedule_name', '');
+                });
             } else {
                 $query->where('schedule_name', $scheduleName);
             }
         }
 
         if ($hasPublishFlag && isset($validated['is_published'])) {
-            $query->where('is_published', (bool) $validated['is_published']);
+            $isPublished = (bool) $validated['is_published'];
+            if ($isPublished === false) {
+                $query->where(function ($q) {
+                    $q->where('is_published', false)
+                        ->orWhereNull('is_published');
+                });
+            } else {
+                $query->where('is_published', true);
+            }
         }
 
         $deleted = $query->delete();

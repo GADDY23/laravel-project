@@ -60,6 +60,12 @@
                 <option value="">No teacher</option>
             </select>
         </div>
+        <div class="mt-4 space-y-2">
+            <label class="text-xs font-medium text-gray-600">Room</label>
+            <select id="teacher-modal-room" class="w-full rounded-md border-gray-300 shadow-sm text-sm">
+                <option value="">Select room</option>
+            </select>
+        </div>
         <div class="mt-6 flex items-center justify-end gap-3">
             <button type="button" id="teacher-modal-cancel" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancel</button>
             <button type="button" id="teacher-modal-save" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Save</button>
@@ -204,25 +210,25 @@
             ? $rooms->whereIn('id', $selectedRooms)
             : $rooms;
     @endphp
-    <div id="timetable-grid" class="lg:col-span-9 bg-white dark:bg-gray-800 rounded-lg shadow p-4 overflow-x-auto">
+    <div id="timetable-grid" class="timetable-shell lg:col-span-9 bg-white dark:bg-gray-800 rounded-lg shadow p-4 overflow-x-auto">
         @php
             $selectedRoomIds = array_values(array_filter(array_map('intval', (array) ($selectedRooms ?? []))));
             $availableRooms = $rooms->whereNotIn('id', $selectedRoomIds);
             $selectedRoomsForSelect = $rooms->whereIn('id', $selectedRoomIds);
         @endphp
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
-            <div class="inline-flex rounded-lg bg-gray-100 dark:bg-gray-900 p-1">
-                <button type="button" class="timetable-tab px-4 py-1.5 text-sm font-semibold rounded-md bg-white text-gray-900 shadow-sm" data-view="room">
-                    Rooms
-                </button>
-                <button type="button" class="timetable-tab px-4 py-1.5 text-sm font-semibold rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900" data-view="section">
+        <div class="timetable-controls flex flex-wrap items-center justify-between gap-3 mb-2">
+            <div class="inline-flex rounded-lg bg-gray-100 dark:bg-gray-900 p-1 overflow-x-auto max-w-full">
+                <button type="button" class="timetable-tab px-4 py-1.5 text-sm font-semibold rounded-md bg-white text-gray-900 shadow-sm" data-view="section">
                     Sections
+                </button>
+                <button type="button" class="timetable-tab px-4 py-1.5 text-sm font-semibold rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900" data-view="room">
+                    Rooms
                 </button>
                 <button type="button" class="timetable-tab px-4 py-1.5 text-sm font-semibold rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900" data-view="teacher">
                     Teachers
                 </button>
             </div>
-            <div class="flex flex-nowrap items-center gap-3 text-sm overflow-x-auto">
+            <div class="flex flex-nowrap items-center gap-3 text-sm overflow-x-auto max-w-full">
                 <form method="GET" action="{{ route('admin.schedules.timetable') }}" class="flex items-center gap-2 room-controls shrink-0">
                     <input type="hidden" name="term_id" value="{{ $termId }}">
                     <input type="hidden" name="schedule_name" value="{{ $scheduleName }}">
@@ -967,6 +973,52 @@
     .resize-handle {
         touch-action: none;
     }
+
+    @media (max-width: 1024px) {
+        .timetable-shell {
+            padding: 0.75rem;
+        }
+
+        .timetable-controls {
+            gap: 0.75rem;
+        }
+    }
+
+    @media (max-width: 640px) {
+        :root {
+            --timetable-slot-height: 34px;
+        }
+
+        .timetable-shell {
+            padding: 0.5rem;
+        }
+
+        .timetable-controls {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .timetable-controls .inline-flex {
+            width: 100%;
+        }
+
+        .timetable-controls form {
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .timetable-controls select,
+        .timetable-controls button {
+            flex: 1 1 auto;
+        }
+
+        table th,
+        table td {
+            font-size: 11px;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+        }
+    }
 </style>
 
 <script>
@@ -1015,6 +1067,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const conflictPopup = document.getElementById('conflict-popup');
     const conflictPopupList = document.getElementById('conflict-popup-list');
     const conflictPopupClose = document.getElementById('conflict-popup-close');
+    const teacherModalRoom = document.getElementById('teacher-modal-room');
     let conflictPopupTimer = null;
     let draggedData = null;
     let activeDropZone = null;
@@ -1174,8 +1227,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const scheduleId = item.dataset.scheduleId;
             const index = schedulesData.findIndex((entry) => String(entry.id) === String(scheduleId));
             if (index < 0) return;
-            const height = item.getBoundingClientRect().height || 0;
-            const slotCount = item.dataset.slotCount || String(getSlotCountFromHeight(height));
+            const slotCount = item.dataset.slotCount || String(getSlotCountFromTimes(item.dataset.timeStart, item.dataset.timeEnd));
             schedulesData[index] = {
                 ...schedulesData[index],
                 time_start: item.dataset.timeStart,
@@ -1183,6 +1235,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 slot_count: slotCount
             };
         });
+        saveDraftState();
     }
 
     const adminSidebar = document.querySelector('.admin-sidebar');
@@ -1404,19 +1457,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function buildTeacherOptions(subjectId, selectedId) {
         const subject = subjectMap.get(String(subjectId));
-        const options = [{ value: '', label: 'No teacher' }];
+        const options = [{ value: '', label: 'No teacher', compatible: false }];
         teachersData.forEach((teacher) => {
             const compatible = isTeacherCompatible(teacher, subject);
             options.push({
                 value: String(teacher.id),
-                label: compatible ? `${teacher.name} (Compatible)` : teacher.name
+                label: teacher.name,
+                compatible
             });
+        });
+        options.sort((a, b) => {
+            if (a.value === '') return -1;
+            if (b.value === '') return 1;
+            if (a.compatible !== b.compatible) {
+                return a.compatible ? -1 : 1;
+            }
+            return a.label.localeCompare(b.label);
         });
         teacherModalSelect.innerHTML = '';
         options.forEach((opt) => {
             const optionEl = document.createElement('option');
             optionEl.value = opt.value;
-            optionEl.textContent = opt.label;
+            optionEl.textContent = opt.compatible ? `★ ${opt.label}` : opt.label;
             teacherModalSelect.appendChild(optionEl);
         });
         if (selectedId !== undefined && selectedId !== null) {
@@ -1426,14 +1488,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function buildRoomOptions(subjectId, selectedRoomId) {
+        if (!teacherModalRoom) return;
+        const subject = subjectMap.get(String(subjectId));
+        const allowedRoomIds = new Set(
+            [
+                ...(initialSelectedRooms || []),
+                ...schedulesData.map((item) => item.room_id).filter(Boolean),
+                selectedRoomId
+            ].map((id) => String(id))
+        );
+        const baseRooms = allowedRoomIds.size
+            ? roomsData.filter((room) => allowedRoomIds.has(String(room.id)))
+            : [];
+        const compatibleRooms = baseRooms.filter((room) => isRoomCompatible(subject, room));
+
+        teacherModalRoom.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select room';
+        teacherModalRoom.appendChild(placeholder);
+
+        compatibleRooms
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .forEach((room) => {
+                const optionEl = document.createElement('option');
+                optionEl.value = String(room.id);
+                optionEl.textContent = room.name;
+                teacherModalRoom.appendChild(optionEl);
+            });
+
+        if (selectedRoomId) {
+            teacherModalRoom.value = String(selectedRoomId);
+        }
+    }
+
     function openTeacherModal(scheduleItem) {
         if (!teacherModal || !scheduleItem) return;
         activeScheduleForTeacher = scheduleItem;
         const subjectId = scheduleItem.dataset.subjectId;
         const subjectName = subjectMap.get(String(subjectId))?.name || 'Selected subject';
         const currentTeacherId = scheduleItem.dataset.teacherId || '';
+        const currentRoomId = scheduleItem.dataset.roomId || '';
         teacherModalSubject.textContent = subjectName;
         buildTeacherOptions(subjectId, currentTeacherId);
+        buildRoomOptions(subjectId, currentRoomId);
         teacherModal.classList.remove('hidden');
         teacherModal.classList.add('flex');
     }
@@ -1790,7 +1889,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const termId = card.dataset.termId || termInput.value || termFilter?.value;
         if (!subjectId || !sectionId || !termId) return;
 
-        const defaultRoomId = getDefaultRoomId(subjectId);
+        const defaultRoomId = null;
         const defaultTeacherId = null;
         const duration = parseFloat(durationInput.value) || 1;
 
@@ -1974,8 +2073,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function normalizeTimeValue(time) {
         if (!time) return '';
-        const value = String(time);
-        return value.length >= 5 ? value.slice(0, 5) : value;
+        const value = String(time).trim();
+        // Extract HH:MM from strings like "07:00", "07:00:00", "2026-03-13 07:00:00", or ISO timestamps.
+        const match = value.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+        if (!match) {
+            return value.length >= 5 ? value.slice(0, 5) : value;
+        }
+        const hours = String(match[1]).padStart(2, '0');
+        const minutes = match[2];
+        return `${hours}:${minutes}`;
     }
 
     function formatTimeLabel(time) {
@@ -2004,7 +2110,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getSlotCountFromTimes(startTime, endTime) {
         const duration = parseMinutes(endTime) - parseMinutes(startTime);
-        return Math.max(1, Math.round(duration / 60));
+        if (!Number.isFinite(duration)) return 1;
+        return Math.max(1, Math.ceil(duration / 60));
     }
 
     function normalizeSchedulePayload(schedule) {
@@ -2116,7 +2223,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (String(item.room_id) === String(candidate.room_id)) {
+            if (candidate.room_id && String(item.room_id) === String(candidate.room_id)) {
                 conflicts.room = 'Room is already booked at this time.';
             }
             if (String(item.section_id) === String(candidate.section_id)) {
@@ -2244,7 +2351,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="meta-line text-gray-700 dark:text-gray-300">${sectionName}</div>
                 ${teacherName ? `<div class="meta-line text-gray-600 dark:text-gray-400">${teacherName}</div>` : ''}
-                <div class="meta-line text-gray-600 dark:text-gray-400">${roomName}</div>
+                ${roomName ? `<div class="meta-line text-gray-600 dark:text-gray-400">${roomName}</div>` : ''}
             </div>
         `;
 
@@ -2438,11 +2545,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     return false;
                 }
 
-                return (
-                    (placementData.teacher_id && item.teacher_id && String(item.teacher_id) === String(placementData.teacher_id)) ||
-                    String(item.section_id) === String(placementData.section_id) ||
-                    String(item.room_id) === String(placementData.room_id)
-                );
+                const teacherConflict = placementData.teacher_id && item.teacher_id && String(item.teacher_id) === String(placementData.teacher_id);
+                const sectionConflict = String(item.section_id) === String(placementData.section_id);
+                const roomConflict = placementData.room_id && String(item.room_id) === String(placementData.room_id);
+                return teacherConflict || sectionConflict || roomConflict;
             });
 
             if (isConflict) {
@@ -2501,7 +2607,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.debug('initSubjectDragHandlers attached to', document.querySelectorAll('.subject-draggable').length, 'items');
 
     const savedView = localStorage.getItem(storageKeyView);
-    setTimetableView(savedView || 'room');
+    setTimetableView(savedView || 'section');
     timetableTabs.forEach((tab) => {
         tab.addEventListener('click', () => setTimetableView(tab.dataset.view));
     });
@@ -2567,6 +2673,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const scheduleItem = activeScheduleForTeacher;
         const scheduleId = scheduleItem.dataset.scheduleId;
         const newTeacherId = teacherModalSelect.value || null;
+        const newRoomId = teacherModalRoom?.value || null;
 
         const payload = {
             id: scheduleId,
@@ -2574,13 +2681,22 @@ document.addEventListener('DOMContentLoaded', () => {
             teacher_id: newTeacherId,
             subject_id: scheduleItem.dataset.subjectId,
             section_id: scheduleItem.dataset.sectionId,
-            room_id: scheduleItem.dataset.roomId,
+            room_id: newRoomId,
             term_id: scheduleItem.dataset.termId,
             day: scheduleItem.dataset.day,
             time_start: scheduleItem.dataset.timeStart,
             time_end: scheduleItem.dataset.timeEnd,
             is_published: scheduleItem.dataset.isPublished === '1'
         };
+
+        if (newRoomId) {
+            const subjectForRoom = subjectMap.get(String(payload.subject_id));
+            const roomForModal = roomsData.find((room) => String(room.id) === String(newRoomId));
+            if (!isRoomCompatible(subjectForRoom, roomForModal)) {
+                showConflictPopup({ room_type: 'Selected room type is not compatible with this subject.' });
+                return;
+            }
+        }
 
         if (!autosaveEnabled) {
             const conflicts = getLocalConflicts(payload, scheduleId);
@@ -2877,8 +2993,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const defaultRoomId = getDefaultRoomId(subjectId);
-        const defaultTeacherId = null;
+            const defaultRoomId = null;
+            const defaultTeacherId = null;
             const duration = parseFloat(durationInput.value) || 1;
 
             draggedData = {
@@ -3019,7 +3135,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function placeScheduleInCell(cell, placementData) {
         const day = cell.dataset.day;
         const timeStart = cell.dataset.timeStart;
-        const roomId = cell.dataset.roomId || placementData.room_id;
+        const roomId = cell.dataset.roomId || placementData.room_id || null;
 
         let timeEnd;
         if (placementData.schedule_id && placementData.slot_count) {
@@ -3053,6 +3169,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const isUpdate = placementData.schedule_id && placementData.schedule_id !== 'undefined' && placementData.schedule_id !== '';
         if (isUpdate && placementData.day === day && placementData.time_start === timeStart && placementData.time_end === timeEnd) {
             return;
+        }
+
+        if (!roomId) {
+            const draftId = placementData.schedule_id || placementData.draft_id || `draft-${Date.now()}-${draftIdCounter++}`;
+            const draftSchedule = {
+                id: draftId,
+                teacher_id: placementData.teacher_id || null,
+                subject_id: placementData.subject_id,
+                section_id: placementData.section_id,
+                room_id: null,
+                term_id: placementData.term_id,
+                day: day,
+                time_start: timeStart,
+                time_end: timeEnd,
+                slot_count: slotCount,
+                is_published: false
+            };
+
+            const conflicts = getLocalConflicts(draftSchedule, placementData.schedule_id || placementData.draft_id || null);
+            if (Object.keys(conflicts).length) {
+                showConflictPopup(conflicts);
+                return null;
+            }
+
+            applyScheduleUpdate(draftSchedule, cell);
+            return draftSchedule;
         }
 
         const subject = subjectMap.get(String(placementData.subject_id));

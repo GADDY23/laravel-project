@@ -512,7 +512,7 @@
                                                                 @if(!empty($scheduleInCell['schedule']->teacher))
                                                                     <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->teacher->name }}</div>
                                                                 @endif
-                                                                <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name }}</div>
+                                                                <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name ?? 'Room: TBD' }}</div>
                                                             </div>
                                                         </div>
                                                     @elseif(!$isCovered)
@@ -641,7 +641,7 @@
                                                                 @if(!empty($scheduleInCell['schedule']->teacher))
                                                                     <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->teacher->name }}</div>
                                                                 @endif
-                                                                <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name }}</div>
+                                                                <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name ?? 'Room: TBD' }}</div>
                                                             </div>
                                                         </div>
                                                     @elseif(!$isCovered)
@@ -772,7 +772,7 @@
                                                                     @if(!empty($scheduleInCell['schedule']->teacher))
                                                                         <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->teacher->name }}</div>
                                                                     @endif
-                                                                    <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name }}</div>
+                                                                    <div class="meta-line text-gray-600 dark:text-gray-400">{{ $scheduleInCell['schedule']->room->name ?? 'Room: TBD' }}</div>
                                                                 </div>
                                                             </div>
                                                         @elseif(!$isCovered)
@@ -2217,7 +2217,7 @@ document.addEventListener('DOMContentLoaded', () => {
             teacher_id: schedule.teacher_id || null,
             subject_id: schedule.subject_id,
             section_id: schedule.section_id,
-            room_id: schedule.room_id,
+            room_id: schedule.room_id ?? null,
             term_id: schedule.term_id,
             day: schedule.day,
             time_start: schedule.time_start,

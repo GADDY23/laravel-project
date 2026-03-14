@@ -102,7 +102,7 @@ class ScheduleController extends Controller
             'teacher_id' => ['nullable', Rule::exists('users', 'id')->where(fn($q) => $q->where('role', 'teacher')->where('account_status', 'active'))],
             'subject_id' => ['required', Rule::exists('subjects', 'id')->where('status', 'active')],
             'section_id' => ['required', Rule::exists('sections', 'id')->where('status', 'active')],
-            'room_id' => ['required', Rule::exists('rooms', 'id')->where('status', 'available')],
+            'room_id' => ['nullable', Rule::exists('rooms', 'id')->where('status', 'available')],
             'term_id' => ['required', Rule::exists('terms', 'id')->where('is_enabled', true)],
             'day' => 'required|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
             'time_start' => 'required|date_format:H:i',
@@ -163,7 +163,7 @@ class ScheduleController extends Controller
             'teacher_id' => ['nullable', Rule::exists('users', 'id')->where(fn($q) => $q->where('role', 'teacher')->where('account_status', 'active'))],
             'subject_id' => ['required', Rule::exists('subjects', 'id')->where('status', 'active')],
             'section_id' => ['required', Rule::exists('sections', 'id')->where('status', 'active')],
-            'room_id' => ['required', Rule::exists('rooms', 'id')->where('status', 'available')],
+            'room_id' => ['nullable', Rule::exists('rooms', 'id')->where('status', 'available')],
             'term_id' => ['required', Rule::exists('terms', 'id')->where('is_enabled', true)],
             'day' => 'required|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
             'time_start' => 'required|date_format:H:i',
@@ -287,13 +287,15 @@ class ScheduleController extends Controller
                 ->when($excludeScheduleId, fn($q) => $q->where('id', '!=', $excludeScheduleId));
         };
 
-        $roomConflictExists = Schedule::query()
-            ->where('room_id', $data['room_id'])
-            ->where($overlap)
-            ->exists();
+        if (!empty($data['room_id'])) {
+            $roomConflictExists = Schedule::query()
+                ->where('room_id', $data['room_id'])
+                ->where($overlap)
+                ->exists();
 
-        if ($roomConflictExists) {
-            $conflicts['room'] = 'Room is already booked at this time.';
+            if ($roomConflictExists) {
+                $conflicts['room'] = 'Room is already booked at this time.';
+            }
         }
 
         return $conflicts;
@@ -382,10 +384,16 @@ class ScheduleController extends Controller
             $schedules = Schedule::with(['teacher', 'subject', 'section', 'room', 'term'])
                 ->whereHas('subject', fn($q) => $q->active())
                 ->whereHas('section', fn($q) => $q->active())
-                ->whereHas('room', fn($q) => $q->available())
+                ->where(function ($q) {
+                    $q->whereNull('room_id')
+                        ->orWhereHas('room', fn($roomQuery) => $roomQuery->available());
+                })
                 ->whereHas('term', fn($q) => $q->enabled())
                 ->when($termId, fn($q) => $q->where('term_id', $termId))
-                ->when(count($selectedRooms) > 0, fn($q) => $q->whereIn('room_id', $selectedRooms))
+                ->when(count($selectedRooms) > 0, fn($q) => $q->where(function ($roomQuery) use ($selectedRooms) {
+                    $roomQuery->whereIn('room_id', $selectedRooms)
+                        ->orWhereNull('room_id');
+                }))
                 ->orderBy('day')
                 ->orderBy('time_start')
                 ->get();
@@ -487,7 +495,7 @@ class ScheduleController extends Controller
             'teacher_id' => ['nullable', Rule::exists('users', 'id')->where(fn($q) => $q->where('role', 'teacher')->where('account_status', 'active'))],
             'subject_id' => ['required', Rule::exists('subjects', 'id')->where('status', 'active')],
             'section_id' => ['required', Rule::exists('sections', 'id')->where('status', 'active')],
-            'room_id' => ['required', Rule::exists('rooms', 'id')->where('status', 'available')],
+            'room_id' => ['nullable', Rule::exists('rooms', 'id')->where('status', 'available')],
             'term_id' => ['required', Rule::exists('terms', 'id')->where('is_enabled', true)],
             'curriculum_id' => ['nullable', Rule::exists('curricula', 'id')],
             'day' => 'required|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
@@ -531,7 +539,7 @@ class ScheduleController extends Controller
         $validated = $request->validate([
             'teacher_id' => ['nullable', Rule::exists('users', 'id')->where(fn($q) => $q->where('role', 'teacher')->where('account_status', 'active'))],
             'section_id' => ['required', Rule::exists('sections', 'id')->where('status', 'active')],
-            'room_id' => ['required', Rule::exists('rooms', 'id')->where('status', 'available')],
+            'room_id' => ['nullable', Rule::exists('rooms', 'id')->where('status', 'available')],
             'term_id' => ['required', Rule::exists('terms', 'id')->where('is_enabled', true)],
             'day' => 'required|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
             'time_start' => 'required|date_format:H:i',
@@ -585,6 +593,7 @@ class ScheduleController extends Controller
 
             $relationErrors = [];
             foreach ($draftSchedules as $idx => $draft) {
+                $roomId = $draft['room_id'] ?? null;
                 if ((int) $draft['term_id'] !== $termId) {
                     $relationErrors["draft_schedules.{$idx}.term_id"] = 'Schedule term does not match the selected term.';
                     continue;
@@ -599,7 +608,7 @@ class ScheduleController extends Controller
                     'teacher_id' => $draft['teacher_id'] ?? null,
                     'subject_id' => $draft['subject_id'],
                     'section_id' => $draft['section_id'],
-                    'room_id' => $draft['room_id'],
+                    'room_id' => $roomId,
                     'term_id' => $termId,
                     'curriculum_id' => $curriculumId,
                 ];
@@ -619,10 +628,11 @@ class ScheduleController extends Controller
 
             $roomDayBuckets = [];
             foreach ($draftSchedules as $draft) {
-                if (empty($draft['room_id'])) {
+                $roomId = $draft['room_id'] ?? null;
+                if (empty($roomId)) {
                     continue;
                 }
-                $bucketKey = $draft['room_id'] . '|' . $draft['day'];
+                $bucketKey = $roomId . '|' . $draft['day'];
                 $roomDayBuckets[$bucketKey][] = $draft;
             }
 
@@ -655,12 +665,13 @@ class ScheduleController extends Controller
                 $now = now();
                 $hasSlotCount = Schema::hasColumn('schedules', 'slot_count');
                 $payload = array_map(function ($draft) use ($now, $scheduleName, $hasSlotCount) {
+                    $roomId = $draft['room_id'] ?? null;
                     $slotCount = $draft['slot_count'] ?? $this->computeSlotCount($draft['time_start'], $draft['time_end']);
                     return [
                         'teacher_id' => $draft['teacher_id'] ?? null,
                         'subject_id' => $draft['subject_id'],
                         'section_id' => $draft['section_id'],
-                        'room_id' => $draft['room_id'],
+                        'room_id' => $roomId,
                         'term_id' => $draft['term_id'],
                         'schedule_name' => $scheduleName,
                         'day' => $draft['day'],
@@ -753,7 +764,7 @@ class ScheduleController extends Controller
             'draft_schedules.*.teacher_id' => ['nullable', Rule::exists('users', 'id')->where(fn($q) => $q->where('role', 'teacher')->where('account_status', 'active'))],
             'draft_schedules.*.subject_id' => ['required', Rule::exists('subjects', 'id')->where('status', 'active')],
             'draft_schedules.*.section_id' => ['required', Rule::exists('sections', 'id')->where('status', 'active')],
-            'draft_schedules.*.room_id' => ['required', Rule::exists('rooms', 'id')->where('status', 'available')],
+            'draft_schedules.*.room_id' => ['nullable', Rule::exists('rooms', 'id')->where('status', 'available')],
             'draft_schedules.*.term_id' => ['required', 'integer'],
             'draft_schedules.*.day' => ['required', 'in:monday,tuesday,wednesday,thursday,friday,saturday,sunday'],
             'draft_schedules.*.time_start' => ['required', 'date_format:H:i'],
@@ -769,6 +780,7 @@ class ScheduleController extends Controller
 
         $relationErrors = [];
         foreach ($draftSchedules as $idx => $draft) {
+            $roomId = $draft['room_id'] ?? null;
             if ((int) $draft['term_id'] !== $termId) {
                 $relationErrors["draft_schedules.{$idx}.term_id"] = 'Schedule term does not match the selected term.';
                 continue;
@@ -783,7 +795,7 @@ class ScheduleController extends Controller
                 'teacher_id' => $draft['teacher_id'] ?? null,
                 'subject_id' => $draft['subject_id'],
                 'section_id' => $draft['section_id'],
-                'room_id' => $draft['room_id'],
+                'room_id' => $roomId,
                 'term_id' => $termId,
                 'curriculum_id' => $curriculumId,
             ];
@@ -803,7 +815,11 @@ class ScheduleController extends Controller
 
         $roomDayBuckets = [];
         foreach ($draftSchedules as $draft) {
-            $bucketKey = $draft['room_id'] . '|' . $draft['day'];
+            $roomId = $draft['room_id'] ?? null;
+            if (empty($roomId)) {
+                continue;
+            }
+            $bucketKey = $roomId . '|' . $draft['day'];
             $roomDayBuckets[$bucketKey][] = $draft;
         }
 
@@ -828,8 +844,12 @@ class ScheduleController extends Controller
             ->get(['room_id', 'day', 'time_start', 'time_end']);
 
         foreach ($draftSchedules as $draft) {
+            $roomId = $draft['room_id'] ?? null;
+            if (empty($roomId)) {
+                continue;
+            }
             foreach ($publishedConflicts as $published) {
-                if ((int) $published->room_id !== (int) $draft['room_id']) {
+                if ((int) $published->room_id !== (int) $roomId) {
                     continue;
                 }
                 if ($published->day !== $draft['day']) {
@@ -862,12 +882,13 @@ class ScheduleController extends Controller
             $now = now();
                 $hasSlotCount = Schema::hasColumn('schedules', 'slot_count');
                 $payload = array_map(function ($draft) use ($now, $scheduleName, $hasSlotCount) {
+                    $roomId = $draft['room_id'] ?? null;
                     $slotCount = $draft['slot_count'] ?? $this->computeSlotCount($draft['time_start'], $draft['time_end']);
                     return [
                         'teacher_id' => $draft['teacher_id'] ?? null,
                         'subject_id' => $draft['subject_id'],
                         'section_id' => $draft['section_id'],
-                        'room_id' => $draft['room_id'],
+                        'room_id' => $roomId,
                         'term_id' => $draft['term_id'],
                         'schedule_name' => $scheduleName,
                         'day' => $draft['day'],

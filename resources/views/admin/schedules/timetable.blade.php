@@ -135,9 +135,9 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Room</label>
-                    <select name="room_id" id="room_id" required class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">Select Room</option>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Room <span class="text-gray-500 text-xs">(optional)</span></label>
+                    <select name="room_id" id="room_id" class="w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="">No room selected</option>
                     </select>
                 </div>
 
@@ -946,8 +946,8 @@
     }
 
     .drop-zone-conflict {
-        background-color: rgba(239, 68, 68, 0.14) !important;
-        box-shadow: inset 0 0 0 2px rgba(239, 68, 68, 0.55);
+        background-color: transparent !important;
+        box-shadow: none;
     }
 
     .subject-meta {
@@ -1099,6 +1099,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let resizeOriginalHeight = 0;
     let resizeWasDraggable = null;
     let resizeOriginalEndTime = null;
+    let ignoreModalUntil = 0;
 
     const curriculaData = @json($curriculaPayload);
     const subjectsData = @json($subjectsPayload);
@@ -2150,6 +2151,20 @@ document.addEventListener('DOMContentLoaded', () => {
         card.removeAttribute('aria-disabled');
     }
 
+    function ensureResizeHandles() {
+        document.querySelectorAll('.schedule-item').forEach((item) => {
+            if (item.querySelector('.resize-handle')) return;
+            const handle = document.createElement('div');
+            handle.className = 'resize-handle absolute bottom-0 left-0 right-0 h-2 cursor-s-resize bg-transparent hover:bg-indigo-200/40';
+            handle.title = 'Drag to adjust duration';
+            item.appendChild(handle);
+            observeScheduleItem(item);
+            const slots = parseInt(item.dataset.slotCount || '0', 10) || getSlotCountFromHeight(item.getBoundingClientRect().height);
+            updateScheduleBodySize(item, slots);
+            saveDraftState();
+        });
+    }
+
     function updateSidebarAssignment(schedule, options = {}) {
         const normalized = normalizeSchedulePayload(schedule);
         if (!normalized) return;
@@ -2177,6 +2192,7 @@ document.addEventListener('DOMContentLoaded', () => {
             meta.textContent = parts.join(' · ');
             meta.classList.remove('hidden');
             lockSubjectCard(target);
+            ensureResizeHandles();
         });
     }
 
@@ -2370,10 +2386,27 @@ document.addEventListener('DOMContentLoaded', () => {
         entries.forEach((entry) => {
             const item = entry.target;
             if (!item || !item.classList.contains('schedule-item')) return;
+            const isHidden = item.closest('.hidden') !== null || item.offsetParent === null;
             const height = entry.contentRect?.height || item.getBoundingClientRect().height;
+            if (isHidden || height < 8) {
+                return;
+            }
             const slots = getSlotCountFromHeight(height);
             item.dataset.slotCount = String(slots);
             updateScheduleBodySize(item, slots);
+            const scheduleId = item.dataset.scheduleId;
+            const index = schedulesData.findIndex((entry) => String(entry.id) === String(scheduleId));
+            if (index >= 0) {
+                const timeStart = item.dataset.timeStart;
+                const timeEnd = getEndTimeFromStartAndSlots(timeStart, slots);
+                schedulesData[index] = {
+                    ...schedulesData[index],
+                    time_start: timeStart,
+                    time_end: timeEnd,
+                    slot_count: String(slots)
+                };
+                item.dataset.timeEnd = timeEnd;
+            }
         });
     }) : null;
 
@@ -3168,7 +3201,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const slotCount = getSlotCountFromTimes(timeStart, timeEnd);
         const isUpdate = placementData.schedule_id && placementData.schedule_id !== 'undefined' && placementData.schedule_id !== '';
-        if (isUpdate && placementData.day === day && placementData.time_start === timeStart && placementData.time_end === timeEnd) {
+        if (!placementData.force_update && isUpdate && placementData.day === day && placementData.time_start === timeStart && placementData.time_end === timeEnd) {
             return;
         }
 
@@ -3406,7 +3439,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return formatMinutes(endMinutes);
     }
 
-    async function resizeScheduleItem(scheduleItem, newEndTime) {
+    async function resizeScheduleItem(scheduleItem, newEndTime, slotCount) {
         const cell = scheduleItem.closest('.drop-zone');
         if (!cell) return;
 
@@ -3419,29 +3452,61 @@ document.addEventListener('DOMContentLoaded', () => {
             term_id: scheduleItem.dataset.termId,
             day: scheduleItem.dataset.day,
             time_start: scheduleItem.dataset.timeStart,
-            time_end: newEndTime
+            time_end: newEndTime,
+            slot_count: slotCount,
+            force_update: true
         };
 
         // Provide conflict preview while resizing.
         renderConflictHeatmap(placementData);
-
+        
         const result = await placeScheduleInCell(cell, placementData);
+    
+        
         if (!result) {
             updateSidebarAssignment(getScheduleDataFromItem(scheduleItem));
+            saveDraftState();
+            
         }
+        
     }
 
-    function ensureResizeHandles() {
-        document.querySelectorAll('.schedule-item').forEach((item) => {
-            if (item.querySelector('.resize-handle')) return;
-            const handle = document.createElement('div');
-            handle.className = 'resize-handle absolute bottom-0 left-0 right-0 h-2 cursor-s-resize bg-transparent hover:bg-indigo-200/40';
-            handle.title = 'Drag to adjust duration';
-            item.appendChild(handle);
-            observeScheduleItem(item);
-            const slots = parseInt(item.dataset.slotCount || '0', 10) || getSlotCountFromHeight(item.getBoundingClientRect().height);
-            updateScheduleBodySize(item, slots);
+    
+
+    function updateResizeState(item, slots) {
+        const newHeight = Math.max(SLOT_HEIGHT, slots * SLOT_HEIGHT - 4);
+        item.style.height = `${newHeight}px`;
+        item.dataset.slotCount = String(slots);
+        updateScheduleBodySize(item, slots);
+
+        const newEndTime = getEndTimeFromStartAndSlots(item.dataset.timeStart, slots);
+        item.dataset.timeEnd = newEndTime;
+
+        const scheduleId = item.dataset.scheduleId;
+        const scheduleIndex = schedulesData.findIndex((entry) => String(entry.id) === String(scheduleId));
+        if (scheduleIndex >= 0) {
+            schedulesData[scheduleIndex] = {
+                ...schedulesData[scheduleIndex],
+                time_end: newEndTime,
+                slot_count: String(slots)
+            };
+        }
+
+        renderConflictHeatmap({
+            ...getScheduleDataFromItem(item),
+            time_end: newEndTime
         });
+
+        updateSidebarAssignment({
+            subject_id: item.dataset.subjectId,
+            section_id: item.dataset.sectionId,
+            room_id: item.dataset.roomId,
+            day: item.dataset.day,
+            time_start: item.dataset.timeStart,
+            time_end: newEndTime
+        });
+
+        return newEndTime;
     }
 
     function handleScheduleResizeStart(e) {
@@ -3457,6 +3522,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resizingScheduleItem = scheduleItem;
         resizeWasDraggable = scheduleItem.draggable;
         scheduleItem.draggable = false;
+        ignoreModalUntil = Date.now() + 400;
         resizeStartY = e.pageY;
         resizeOriginalHeight = scheduleItem.getBoundingClientRect().height;
         resizeStartHeight = resizeOriginalHeight;
@@ -3476,27 +3542,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const deltaY = e.pageY - resizeStartY;
         const rawHeight = resizeStartHeight + deltaY;
         const newSlots = Math.max(1, getSlotCountFromHeight(rawHeight));
-        const newHeight = Math.max(SLOT_HEIGHT, newSlots * SLOT_HEIGHT - 4);
-
-        resizingScheduleItem.style.height = `${newHeight}px`;
-        resizingScheduleItem.dataset.slotCount = String(newSlots);
-        updateScheduleBodySize(resizingScheduleItem, newSlots);
-
-        const newEndTime = getEndTimeFromStartAndSlots(resizingScheduleItem.dataset.timeStart, newSlots);
-        resizingScheduleItem.dataset.timeEnd = newEndTime;
-        renderConflictHeatmap({
-            ...getScheduleDataFromItem(resizingScheduleItem),
-            time_end: newEndTime
-        });
-
-        updateSidebarAssignment({
-            subject_id: resizingScheduleItem.dataset.subjectId,
-            section_id: resizingScheduleItem.dataset.sectionId,
-            room_id: resizingScheduleItem.dataset.roomId,
-            day: resizingScheduleItem.dataset.day,
-            time_start: resizingScheduleItem.dataset.timeStart,
-            time_end: newEndTime
-        });
+        updateResizeState(resizingScheduleItem, newSlots);
     }
 
     async function handleScheduleResizeEnd() {
@@ -3505,12 +3551,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const finalHeight = resizingScheduleItem.getBoundingClientRect().height;
         const finalSlots = getSlotCountFromHeight(finalHeight);
         const finalEndTime = getEndTimeFromStartAndSlots(resizingScheduleItem.dataset.timeStart, finalSlots);
+        updateResizeState(resizingScheduleItem, finalSlots);
 
-        const result = await resizeScheduleItem(resizingScheduleItem, finalEndTime);
+        const hasResizeChange = !resizeOriginalEndTime || finalEndTime !== resizeOriginalEndTime;
+        let result = null;
+        if (hasResizeChange) {
+            result = await resizeScheduleItem(resizingScheduleItem, finalEndTime, finalSlots);
+        }
         if (!result && resizeOriginalEndTime) {
             resizingScheduleItem.dataset.timeEnd = resizeOriginalEndTime;
         }
         if (result) {
+            syncSchedulesFromVisibleView();
             refreshSectionView();
             refreshTeacherView();
         }
@@ -3521,6 +3573,8 @@ document.addEventListener('DOMContentLoaded', () => {
         resizingScheduleItem = null;
         resizeWasDraggable = null;
         resizeOriginalEndTime = null;
+        ignoreModalUntil = Date.now() + 400;
+        
         clearConflictHeatmap();
         saveDraftState();
         document.body.style.userSelect = '';
@@ -3692,7 +3746,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (scheduleCard) {
             e.preventDefault();
             e.stopPropagation();
-            openTeacherModal(scheduleCard);
             return;
         }
 
@@ -3707,6 +3760,44 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         await placeScheduleInCell(cell, { ...confirmedDraft });
+    });
+
+    timetableGrid.addEventListener('dblclick', (e) => {
+        if (Date.now() < ignoreModalUntil || resizingScheduleItem) return;
+        if (e.target.closest('.delete-schedule-btn')) return;
+        const scheduleCard = e.target.closest('.schedule-item');
+        if (!scheduleCard) return;
+        e.preventDefault();
+        e.stopPropagation();
+        openTeacherModal(scheduleCard);
+    });
+
+    let lastTouchTapTime = 0;
+    let lastTouchTapItem = null;
+    timetableGrid.addEventListener('pointerup', (e) => {
+        if (e.pointerType !== 'touch') return;
+        if (Date.now() < ignoreModalUntil || resizingScheduleItem) return;
+        if (e.target.closest('.delete-schedule-btn')) return;
+
+        const scheduleCard = e.target.closest('.schedule-item');
+        if (!scheduleCard) {
+            lastTouchTapTime = 0;
+            lastTouchTapItem = null;
+            return;
+        }
+
+        const now = Date.now();
+        if (lastTouchTapItem === scheduleCard && now - lastTouchTapTime < 350) {
+            lastTouchTapTime = 0;
+            lastTouchTapItem = null;
+            e.preventDefault();
+            e.stopPropagation();
+            openTeacherModal(scheduleCard);
+            return;
+        }
+
+        lastTouchTapTime = now;
+        lastTouchTapItem = scheduleCard;
     });
 });
 </script>

@@ -37,11 +37,19 @@
     <div class="min-h-screen flex">
         <!-- Sidebar -->
         <aside class="admin-sidebar w-64 min-h-screen" style="background: linear-gradient(180deg, #1e3a8a 0%, #112a5f 55%, #0a1533 100%);">
-            <div class="p-4">
-                <h1 class="text-white text-xl font-bold">School Scheduling</h1>
-                <p class="text-blue-200 text-sm">Admin Panel</p>
+            <div class="px-5 pb-4 pt-6">
+                <div class="flex flex-col items-center gap-3 text-center">
+                    <img src="{{ asset('aclclogo.png') }}" alt="ACLC logo" class="h-10 w-10 object-contain">
+                    <div>
+                        <h1 class="text-white text-lg font-semibold tracking-wide">School Scheduling</h1>
+                        <p class="text-blue-200 text-xs uppercase tracking-[0.2em]">Admin Panel</p>
+                    </div>
+                </div>
             </div>
-            <nav class="mt-8">
+            <div class="px-5">
+                <div class="h-px w-full bg-white/15"></div>
+            </div>
+            <nav class="mt-4 space-y-1">
                 <a href="{{ route('dashboard') }}" class="flex items-center px-4 py-3 text-blue-100 hover:bg-blue-800/70 {{ request()->routeIs('dashboard') ? 'bg-blue-800/70' : '' }}">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />

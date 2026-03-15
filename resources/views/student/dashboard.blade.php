@@ -11,10 +11,15 @@
     <div class="min-h-screen md:flex">
         <aside class="w-full md:w-72 md:min-h-screen bg-gradient-to-b from-[#041a3d] to-[#0b336f] text-blue-100">
             <div class="px-6 py-7 border-b border-blue-900/60">
-                <p class="text-[11px] tracking-[0.2em] uppercase text-blue-300">Student Panel</p>
-                <h1 class="text-xl font-semibold mt-1 truncate">{{ auth()->user()->name }}</h1>
+                <div class="flex flex-col items-center gap-3 text-center">
+                    <img src="{{ asset('aclclogo.png') }}" alt="ACLC logo" class="h-10 w-auto object-contain">
+                    <div>
+                        <p class="text-[11px] tracking-[0.2em] uppercase text-blue-300">Student Panel</p>
+                        <h1 class="text-xl font-semibold mt-1 text-white truncate">{{ auth()->user()->name }}</h1>
+                    </div>
+                </div>
                 @if($section)
-                    <p class="text-xs text-blue-300 mt-2">Section {{ $section->name }}</p>
+                    <p class="text-xs text-blue-300 mt-3 text-center">Section {{ $section->name }}</p>
                 @endif
             </div>
 

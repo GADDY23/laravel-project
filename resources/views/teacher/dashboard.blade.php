@@ -11,11 +11,19 @@
     <div class="min-h-screen md:flex">
         <aside class="w-full md:w-72 md:min-h-screen bg-gradient-to-b from-[#041b42] to-[#072d66] text-blue-100">
             <div class="px-6 py-7 border-b border-blue-900/60">
-                <p class="text-[11px] tracking-[0.2em] uppercase text-blue-300">Teacher Panel</p>
-                <h1 class="text-xl font-semibold mt-1 truncate">{{ auth()->user()->name }}</h1>
-                @if($activeTerm)
-                    <p class="text-xs text-blue-300 mt-2">{{ $activeTerm->term_code }} | {{ $activeTerm->academic_year }}</p>
-                @endif
+                <div class="flex flex-col items-center gap-3 text-center">
+                    <img src="{{ asset('aclclogo.png') }}" alt="ACLC logo" class="h-10 w-auto object-contain">
+                    <div>
+                        <h1 class="text-lg font-semibold tracking-wide text-white">School Scheduling</h1>
+                        <p class="text-[11px] tracking-[0.2em] uppercase text-blue-300">Teacher Panel</p>
+                    </div>
+                </div>
+                <div class="mt-4 text-center">
+                    <p class="text-sm font-medium text-blue-100 truncate">{{ auth()->user()->name }}</p>
+                    @if($activeTerm)
+                        <p class="text-xs text-blue-300 mt-1">{{ $activeTerm->term_code }} | {{ $activeTerm->academic_year }}</p>
+                    @endif
+                </div>
             </div>
 
             <nav class="p-4 space-y-2">

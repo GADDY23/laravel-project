@@ -18,6 +18,10 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/teacher/timetable', [DashboardController::class, 'teacherTimetable'])->name('teacher.timetable');
+    Route::get('/teacher/information', [DashboardController::class, 'teacherInformation'])->name('teacher.information');
+    Route::get('/student/timetable', [DashboardController::class, 'studentTimetable'])->name('student.timetable');
+    Route::get('/student/information', [DashboardController::class, 'studentInformation'])->name('student.information');
     
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

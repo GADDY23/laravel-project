@@ -87,8 +87,11 @@ class DashboardController extends Controller
             ->when($activeTerm, fn($q) => $q->where('term_id', $activeTerm->id))
             ->whereHas('subject', fn($q) => $q->active())
             ->whereHas('section', fn($q) => $q->active())
-            ->whereHas('room', fn($q) => $q->available())
-            ->whereHas('term', fn($q) => $q->active())
+            ->where(function ($q) {
+                $q->whereNull('room_id')
+                    ->orWhereHas('room', fn($roomQuery) => $roomQuery->available());
+            })
+            ->whereHas('term', fn($q) => $q->enabled())
             ->with(['subject', 'section', 'room', 'term']);
 
         if (Schema::hasColumn('schedules', 'is_published')) {
@@ -102,6 +105,45 @@ class DashboardController extends Controller
         return view('teacher.dashboard', compact('schedules', 'activeTerm'));
     }
 
+    public function teacherTimetable(Request $request)
+    {
+        $user = Auth::user();
+        abort_unless($user?->isTeacher(), 403);
+
+        $activeTerm = Term::active()->first();
+        $termId = $request->get('term_id') ?: $activeTerm?->id;
+        $schedulesQuery = Schedule::where('teacher_id', $user->id)
+            ->when($termId, fn($q) => $q->where('term_id', $termId))
+            ->whereHas('subject', fn($q) => $q->active())
+            ->whereHas('section', fn($q) => $q->active())
+            ->where(function ($q) {
+                $q->whereNull('room_id')
+                    ->orWhereHas('room', fn($roomQuery) => $roomQuery->available());
+            })
+            ->whereHas('term', fn($q) => $q->enabled())
+            ->with(['subject', 'section', 'room', 'term']);
+
+        if (Schema::hasColumn('schedules', 'is_published')) {
+            $schedulesQuery->where('is_published', true);
+        }
+
+        $schedules = $schedulesQuery->orderBy('day')
+            ->orderBy('time_start')
+            ->get();
+
+        return view('teacher.timetable', compact('schedules', 'activeTerm'));
+    }
+
+    public function teacherInformation()
+    {
+        $user = Auth::user();
+        abort_unless($user?->isTeacher(), 403);
+
+        $activeTerm = Term::active()->first();
+
+        return view('teacher.information', compact('activeTerm'));
+    }
+
     private function studentDashboard($user)
     {
         $activeTerm = Term::active()->first();
@@ -112,8 +154,11 @@ class DashboardController extends Controller
             ->when($activeTerm, fn($q) => $q->where('term_id', $activeTerm->id))
             ->whereHas('subject', fn($q) => $q->active())
             ->whereHas('section', fn($q) => $q->active())
-            ->whereHas('room', fn($q) => $q->available())
-            ->whereHas('term', fn($q) => $q->active())
+            ->where(function ($q) {
+                $q->whereNull('room_id')
+                    ->orWhereHas('room', fn($roomQuery) => $roomQuery->available());
+            })
+            ->whereHas('term', fn($q) => $q->enabled())
             ->with(['teacher', 'subject', 'section', 'room', 'term']);
 
         if (Schema::hasColumn('schedules', 'is_published')) {
@@ -125,5 +170,47 @@ class DashboardController extends Controller
             ->get();
 
         return view('student.dashboard', compact('schedules', 'activeTerm', 'section'));
+    }
+
+    public function studentTimetable(Request $request)
+    {
+        $user = Auth::user();
+        abort_unless($user?->isStudent(), 403);
+
+        $activeTerm = Term::active()->first();
+        $termId = $request->get('term_id') ?: $activeTerm?->id;
+        $section = Section::active()->where('name', $user->section)->first();
+
+        $schedulesQuery = Schedule::where('section_id', $section?->id ?? 0)
+            ->when($termId, fn($q) => $q->where('term_id', $termId))
+            ->whereHas('subject', fn($q) => $q->active())
+            ->whereHas('section', fn($q) => $q->active())
+            ->where(function ($q) {
+                $q->whereNull('room_id')
+                    ->orWhereHas('room', fn($roomQuery) => $roomQuery->available());
+            })
+            ->whereHas('term', fn($q) => $q->enabled())
+            ->with(['teacher', 'subject', 'section', 'room', 'term']);
+
+        if (Schema::hasColumn('schedules', 'is_published')) {
+            $schedulesQuery->where('is_published', true);
+        }
+
+        $schedules = $schedulesQuery->orderBy('day')
+            ->orderBy('time_start')
+            ->get();
+
+        return view('student.timetable', compact('schedules', 'activeTerm', 'section'));
+    }
+
+    public function studentInformation()
+    {
+        $user = Auth::user();
+        abort_unless($user?->isStudent(), 403);
+
+        $activeTerm = Term::active()->first();
+        $section = Section::active()->where('name', $user->section)->first();
+
+        return view('student.information', compact('activeTerm', 'section'));
     }
 }

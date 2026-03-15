@@ -1,9 +1,19 @@
 @extends('layouts.admin')
 @section('title', 'Schedule Timetable')
 @section('content')
+@php
+    $isEditable = $isEditable ?? true;
+    $timetableRouteName = $isEditable ? 'admin.schedules.timetable-edit' : 'admin.schedules.timetable-view';
+@endphp
+<div id="timetable-page" class="{{ $isEditable ? '' : 'timetable-view-only' }}">
 <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
     <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Schedule Timetable</h1>
+        <div class="flex flex-wrap items-center gap-3">
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Schedule Timetable</h1>
+            @if(!$isEditable)
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">View Only</span>
+            @endif
+        </div>
         <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
             <div class="flex items-center gap-2">
                 <span class="font-medium text-gray-700 dark:text-gray-300">Schedule:</span>
@@ -22,19 +32,21 @@
 
     <div class="flex flex-col gap-2 lg:items-end">
         <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:w-auto">
-            <button type="button" id="save-schedule-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-center">
+            <button type="button" id="save-schedule-btn" class="edit-only bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-center">
                 Save Schedule
             </button>
-            <button type="button" id="publish-week-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-center">
+            <button type="button" id="publish-week-btn" class="edit-only bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-center">
                 Publish Week
             </button>
-            <a href="{{ $schedules->isNotEmpty() ? route('admin.schedules.index') : route('admin.schedules.configure', ['reset' => 1]) }}" id="cancel-schedule-btn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-center">Cancel</a>
+            <a href="{{ $schedules->isNotEmpty() ? route('admin.schedules.index') : route('admin.schedules.configure', ['reset' => 1]) }}" id="cancel-schedule-btn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-center">
+                {{ $isEditable ? 'Cancel' : 'Back' }}
+            </a>
         </div>
         
     </div>
 </div>
 
-<div id="conflict-popup" class="hidden fixed top-4 right-4 z-50 w-[360px] max-w-[90vw] rounded-lg border border-red-300 bg-red-50 text-red-800 shadow-lg">
+<div id="conflict-popup" class="edit-only hidden fixed top-4 right-4 z-50 w-[360px] max-w-[90vw] rounded-lg border border-red-300 bg-red-50 text-red-800 shadow-lg">
     <div class="flex items-start justify-between gap-3 px-4 py-3 border-b border-red-200">
         <div>
             <p class="font-semibold">Schedule Conflict Detected</p>
@@ -45,7 +57,7 @@
     <ul id="conflict-popup-list" class="px-4 py-3 space-y-1 text-sm"></ul>
 </div>
 
-<div id="teacher-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+<div id="teacher-modal" class="edit-only fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
     <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
         <div class="flex items-start justify-between gap-3">
             <div>
@@ -75,7 +87,7 @@
 
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
     {{-- Left Sidebar - Schedule Builder --}}
-    <div class="lg:col-span-3 bg-white dark:bg-gray-800 rounded-lg shadow p-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
+    <div class="edit-only lg:col-span-3 bg-white dark:bg-gray-800 rounded-lg shadow p-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 border-b pb-2">Sections & Subjects</h2>
         <div id="section-subjects" class="space-y-3 mb-4">
             @php
@@ -210,7 +222,7 @@
             ? $rooms->whereIn('id', $selectedRooms)
             : $rooms;
     @endphp
-    <div id="timetable-grid" class="timetable-shell lg:col-span-9 bg-white dark:bg-gray-800 rounded-lg shadow p-4 overflow-x-auto">
+    <div id="timetable-grid" class="timetable-shell {{ $isEditable ? 'lg:col-span-9' : 'lg:col-span-12' }} bg-white dark:bg-gray-800 rounded-lg shadow p-4 overflow-x-auto">
         @php
             $selectedRoomIds = array_values(array_filter(array_map('intval', (array) ($selectedRooms ?? []))));
             $availableRooms = $rooms->whereNotIn('id', $selectedRoomIds);
@@ -229,7 +241,7 @@
                 </button>
             </div>
             <div class="flex flex-nowrap items-center gap-3 text-sm overflow-x-auto max-w-full">
-                <form method="GET" action="{{ route('admin.schedules.timetable') }}" class="flex items-center gap-2 room-controls shrink-0">
+                <form method="GET" action="{{ route($timetableRouteName) }}" class="edit-only flex items-center gap-2 room-controls shrink-0">
                     <input type="hidden" name="term_id" value="{{ $termId }}">
                     <input type="hidden" name="schedule_name" value="{{ $scheduleName }}">
                     @foreach($selectedRoomIds as $roomId)
@@ -245,7 +257,7 @@
                     <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md">Add</button>
                 </form>
 
-                <form method="GET" action="{{ route('admin.schedules.timetable') }}" class="flex items-center gap-2 section-controls hidden shrink-0">
+                <form method="GET" action="{{ route($timetableRouteName) }}" class="edit-only flex items-center gap-2 section-controls hidden shrink-0">
                     <input type="hidden" name="term_id" value="{{ $termId }}">
                     <input type="hidden" name="schedule_name" value="{{ $scheduleName }}">
                     @foreach($selectedRoomIds as $roomId)
@@ -261,7 +273,7 @@
                     <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md">Add</button>
                 </form>
 
-                <form method="GET" action="{{ route('admin.schedules.timetable') }}" class="flex items-center gap-2 section-controls hidden shrink-0">
+                <form method="GET" action="{{ route($timetableRouteName) }}" class="edit-only flex items-center gap-2 section-controls hidden shrink-0">
                     <input type="hidden" name="term_id" value="{{ $termId }}">
                     <input type="hidden" name="schedule_name" value="{{ $scheduleName }}">
                     @foreach($selectedRoomIds as $roomId)
@@ -277,7 +289,7 @@
                     <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-md">Delete</button>
                 </form>
 
-                <form method="GET" action="{{ route('admin.schedules.timetable') }}" class="flex items-center gap-2 teacher-controls hidden shrink-0">
+                <form method="GET" action="{{ route($timetableRouteName) }}" class="edit-only flex items-center gap-2 teacher-controls hidden shrink-0">
                     <input type="hidden" name="term_id" value="{{ $termId }}">
                     <input type="hidden" name="schedule_name" value="{{ $scheduleName }}">
                     @foreach($selectedRoomIds as $roomId)
@@ -293,7 +305,7 @@
                     <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md">Add</button>
                 </form>
 
-                <form method="GET" action="{{ route('admin.schedules.timetable') }}" class="flex items-center gap-2 teacher-controls hidden shrink-0">
+                <form method="GET" action="{{ route($timetableRouteName) }}" class="edit-only flex items-center gap-2 teacher-controls hidden shrink-0">
                     <input type="hidden" name="term_id" value="{{ $termId }}">
                     <input type="hidden" name="schedule_name" value="{{ $scheduleName }}">
                     @foreach($selectedRoomIds as $roomId)
@@ -309,7 +321,7 @@
                     <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-md">Remove</button>
                 </form>
 
-                <form method="GET" action="{{ route('admin.schedules.timetable') }}" class="flex items-center gap-2 room-controls shrink-0">
+                <form method="GET" action="{{ route($timetableRouteName) }}" class="edit-only flex items-center gap-2 room-controls shrink-0">
                     <input type="hidden" name="term_id" value="{{ $termId }}">
                     <input type="hidden" name="schedule_name" value="{{ $scheduleName }}">
                     @foreach($selectedRoomIds as $roomId)
@@ -331,6 +343,9 @@
             for ($hour = 7; $hour < 19; $hour++) {
                 $timeSlots[] = sprintf('%02d:00', $hour) . ' - ' . sprintf('%02d:00', $hour + 1);
             }
+            $timeSlotStarts = array_map(function ($slot) {
+                return explode(' - ', $slot)[0] ?? '';
+            }, $timeSlots);
             
             $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
             $dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -405,8 +420,9 @@
         <div id="timetable-views" class="space-y-8">
             {{-- Room view --}}
             <div id="view-room" class="view-mode">
+                <div class="timetable-panels-grid">
                 @foreach($roomsToShow as $room)
-                    <div class="mb-8">
+                    <div class="timetable-panel">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Room: {{ $room->name }}</h3>
                         <div class="overflow-x-auto bg-white dark:bg-gray-900 rounded-lg shadow-sm">
                             <table class="min-w-full border-collapse">
@@ -489,7 +505,7 @@
                                                         >
                                                             <button
                                                                 type="button"
-                                                                class="delete-schedule-btn absolute top-1 right-1 h-5 w-5 rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] leading-none flex items-center justify-center shadow"
+                                                                class="delete-schedule-btn edit-only absolute top-1 right-1 h-5 w-5 rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] leading-none flex items-center justify-center shadow"
                                                                 data-schedule-id="{{ $scheduleInCell['schedule']->id }}"
                                                                 title="Remove schedule block"
                                                                 aria-label="Remove schedule block"
@@ -529,13 +545,15 @@
                         </div>
                     </div>
                 @endforeach
+                </div>
             </div>
 
             {{-- Teacher view --}}
             <div id="view-teacher" class="view-mode hidden">
                 <div id="teacher-empty-state" class="text-sm text-gray-500 dark:text-gray-400 hidden">Select a teacher in a block to show their timetable.</div>
+                <div class="timetable-panels-grid">
                 @foreach($teachers as $teacher)
-                    <div class="mb-8 teacher-block" data-teacher-id="{{ $teacher->id }}">
+                    <div class="timetable-panel teacher-block" data-teacher-id="{{ $teacher->id }}">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Teacher: {{ $teacher->name }}</h3>
                         <div class="overflow-x-auto bg-white dark:bg-gray-900 rounded-lg shadow-sm">
                             <table class="min-w-full border-collapse">
@@ -618,7 +636,7 @@
                                                         >
                                                             <button
                                                                 type="button"
-                                                                class="delete-schedule-btn absolute top-1 right-1 h-5 w-5 rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] leading-none flex items-center justify-center shadow"
+                                                                class="delete-schedule-btn edit-only absolute top-1 right-1 h-5 w-5 rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] leading-none flex items-center justify-center shadow"
                                                                 data-schedule-id="{{ $scheduleInCell['schedule']->id }}"
                                                                 title="Remove schedule block"
                                                                 aria-label="Remove schedule block"
@@ -658,6 +676,7 @@
                         </div>
                     </div>
                 @endforeach
+                </div>
             </div>
 
             {{-- Section view --}}
@@ -665,8 +684,9 @@
                 @if($sections->isEmpty())
                     <div class="text-sm text-gray-500 dark:text-gray-400">No sections found for the selected term.</div>
                 @else
+                    <div class="timetable-panels-grid">
                     @foreach($sections as $section)
-                        <div class="mb-8">
+                        <div class="timetable-panel">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Section: {{ $section->name }}</h3>
                             <div class="overflow-x-auto bg-white dark:bg-gray-900 rounded-lg shadow-sm">
                                 <table class="min-w-full border-collapse">
@@ -749,7 +769,7 @@
                                                             >
                                                                 <button
                                                                     type="button"
-                                                                    class="delete-schedule-btn absolute top-1 right-1 h-5 w-5 rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] leading-none flex items-center justify-center shadow"
+                                                                    class="delete-schedule-btn edit-only absolute top-1 right-1 h-5 w-5 rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] leading-none flex items-center justify-center shadow"
                                                                     data-schedule-id="{{ $scheduleInCell['schedule']->id }}"
                                                                     title="Remove schedule block"
                                                                     aria-label="Remove schedule block"
@@ -789,6 +809,7 @@
                             </div>
                         </div>
                     @endforeach
+                    </div>
                 @endif
             </div>
         </div>
@@ -969,9 +990,81 @@
         box-shadow: 0 1px 2px rgba(0,0,0,0.08);
     }
 
+    .timetable-view-only .timetable-panels-grid {
+        display: grid;
+        gap: 1.5rem;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    @media (min-width: 1024px) {
+        .timetable-view-only .timetable-panels-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    .timetable-view-only .timetable-panel table th,
+    .timetable-view-only .timetable-panel table td {
+        padding-left: 0.4rem;
+        padding-right: 0.4rem;
+        font-size: 10px;
+    }
+
+    .timetable-shell table {
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    .timetable-shell th,
+    .timetable-shell td {
+        width: 120px;
+    }
+
+    .timetable-shell th:first-child,
+    .timetable-shell td:first-child {
+        width: 110px;
+    }
+
+    .timetable-shell .timetable-panel > .overflow-x-auto {
+        overflow-y: hidden;
+    }
+
+    .timetable-view-only .timetable-shell {
+        overflow-x: hidden;
+    }
+
+    .timetable-view-only .timetable-panel > .overflow-x-auto {
+        overflow-x: hidden;
+    }
+
+    .timetable-view-only .timetable-shell th,
+    .timetable-view-only .timetable-shell td {
+        width: auto;
+    }
+
+    .timetable-view-only .timetable-shell th:first-child,
+    .timetable-view-only .timetable-shell td:first-child {
+        width: 90px;
+    }
+
     .schedule-item,
     .resize-handle {
         touch-action: none;
+    }
+
+    .timetable-view-only .edit-only {
+        display: none !important;
+    }
+
+    .timetable-view-only .drop-zone,
+    .timetable-view-only .subject-draggable,
+    .timetable-view-only .schedule-item,
+    .timetable-view-only .resize-handle,
+    .timetable-view-only .delete-schedule-btn {
+        pointer-events: none;
+    }
+
+    .timetable-view-only .schedule-item {
+        cursor: default;
     }
 
     @media (max-width: 1024px) {
@@ -1020,6 +1113,8 @@
         }
     }
 </style>
+
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -1110,6 +1205,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const schedulesData = @json($schedulesPayload);
     const conflictSchedulePool = @json($conflictSchedulesPayload);
     const colorClasses = @json($colorClasses);
+    const timeSlotStarts = @json($timeSlotStarts);
 
     const subjectMap = new Map(subjectsData.map((subject) => [String(subject.id), subject]));
     const roomsMap = new Map(roomsData.map((room) => [String(room.id), room]));
@@ -1124,7 +1220,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialSelectedRooms = @json($selectedRooms ?? []);
 
     const endpoints = {
-        timetable: '{{ route("admin.schedules.timetable", [], false) }}',
+        timetable: '{{ route($timetableRouteName, [], false) }}',
         checkConflicts: '{{ route("admin.schedules.check-conflicts", [], false) }}',
         storeFromTimetable: '{{ route("admin.schedules.store-from-timetable", [], false) }}',
         saveDraft: '{{ route("admin.schedules.save-draft", [], false) }}',
@@ -1307,6 +1403,13 @@ document.addEventListener('DOMContentLoaded', () => {
         conflictPopupTimer = setTimeout(() => {
             conflictPopup.classList.add('hidden');
         }, 7000);
+    }
+
+    function exceedsTimetableRange(timeStart, slotCount) {
+        if (!timeSlotStarts || !timeSlotStarts.length) return false;
+        const index = timeSlotStarts.indexOf(timeStart);
+        if (index < 0) return false;
+        return (index + slotCount) > timeSlotStarts.length;
     }
 
     conflictPopupClose?.addEventListener('click', () => {
@@ -2356,7 +2459,7 @@ document.addEventListener('DOMContentLoaded', () => {
             : '';
 
         wrapper.innerHTML = `
-            <button type="button" class="delete-schedule-btn absolute top-1 right-1 h-5 w-5 rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] leading-none flex items-center justify-center shadow"
+            <button type="button" class="delete-schedule-btn edit-only absolute top-1 right-1 h-5 w-5 rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] leading-none flex items-center justify-center shadow"
                 data-schedule-id="${schedule.id}" title="Remove schedule block" aria-label="Remove schedule block">
                 &times;
             </button>
@@ -2607,7 +2710,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!cell || !placementData) return;
         clearDragShadow();
 
-        const slotCount = getPlacementSlotCount(placementData);
+        let slotCount = getPlacementSlotCount(placementData);
+        if (timeSlotStarts && timeSlotStarts.length) {
+            const index = timeSlotStarts.indexOf(cell.dataset.timeStart);
+            if (index >= 0) {
+                const remaining = timeSlotStarts.length - index;
+                slotCount = Math.min(slotCount, Math.max(1, remaining));
+            }
+        }
         const shadow = document.createElement('div');
         // Match the real schedule item footprint for exact visual alignment while dragging.
         shadow.className = 'absolute inset-0 m-0.5 rounded border border-indigo-400 bg-indigo-200/45 dark:bg-indigo-700/35 pointer-events-none';
@@ -2648,7 +2758,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const draftSchedules = loadDraftState();
     if (draftSchedules.length) {
-        applyDraftSchedulesToView(draftSchedules);
+        if (schedulesData.length) {
+            // Server data is the source of truth on edit; discard stale local drafts.
+            localStorage.removeItem(getDraftStorageKey());
+        } else {
+            applyDraftSchedulesToView(draftSchedules);
+        }
     }
 
     if (curriculumSelect) {
@@ -3203,6 +3318,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const isUpdate = placementData.schedule_id && placementData.schedule_id !== 'undefined' && placementData.schedule_id !== '';
         if (!placementData.force_update && isUpdate && placementData.day === day && placementData.time_start === timeStart && placementData.time_end === timeEnd) {
             return;
+        }
+        if (exceedsTimetableRange(timeStart, slotCount)) {
+            const maxStartIndex = Math.max(0, timeSlotStarts.length - slotCount);
+            const adjustedStart = timeSlotStarts[maxStartIndex] || timeStart;
+            if (adjustedStart !== timeStart) {
+                timeStart = adjustedStart;
+                timeEnd = getEndTimeFromStartAndSlots(timeStart, slotCount);
+            } else {
+                showConflictPopup({ slot: 'Schedule exceeds the timetable range.' });
+                return null;
+            }
         }
 
         if (!roomId) {
@@ -3802,4 +3928,3 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 @endsection
-

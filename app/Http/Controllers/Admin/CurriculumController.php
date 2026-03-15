@@ -109,7 +109,7 @@ class CurriculumController extends Controller
 
         $this->syncCurriculumRows($curriculum, $validated);
 
-        return redirect()->route('admin.curricula.edit', $curriculum)
+        return redirect()->route('admin.curricula.index')
             ->with('success', 'Curriculum created successfully. Curriculum code generated automatically.');
     }
 
@@ -203,7 +203,7 @@ class CurriculumController extends Controller
 
         $this->syncCurriculumRows($curriculum, $validated);
 
-        return redirect()->route('admin.curricula.index')
+        return redirect()->route('admin.curricula.edit', $curriculum)
             ->with('success', 'Curriculum updated successfully.');
     }
 

@@ -43,6 +43,43 @@
                 <p class="text-blue-200 mt-2">A quick view of your assigned classes, sections, and rooms.</p>
             </div>
 
+            @php
+                $user = auth()->user();
+            @endphp
+            <div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm mt-6">
+                <h3 class="text-lg font-semibold text-[#0a2a5f] mb-4">Teacher Information</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="text-slate-500">Name</p>
+                        <p class="font-medium text-slate-900">{{ $user->name }}</p>
+                    </div>
+                    <div>
+                        <p class="text-slate-500">Email</p>
+                        <p class="font-medium text-slate-900">{{ $user->email }}</p>
+                    </div>
+                    <div>
+                        <p class="text-slate-500">Username</p>
+                        <p class="font-medium text-slate-900">{{ $user->username ?? '-' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-slate-500">Employee ID</p>
+                        <p class="font-medium text-slate-900">{{ $user->employee_id ?? '-' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-slate-500">Department</p>
+                        <p class="font-medium text-slate-900">{{ $user->department ?? '-' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-slate-500">Expertise</p>
+                        <p class="font-medium text-slate-900">{{ $user->expertise ?? '-' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-slate-500">Account Status</p>
+                        <p class="font-medium text-slate-900">{{ ucfirst($user->account_status ?? 'active') }}</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                 <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
                     <p class="text-sm text-slate-500">Total Classes</p>
@@ -58,129 +95,6 @@
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl border border-slate-200 mt-6 overflow-x-auto shadow-sm p-4">
-                <div class="mb-4 flex items-center justify-between">
-                    <h3 class="text-lg font-semibold text-[#0a2a5f]">Generated Weekly Timetable</h3>
-                    @if($activeTerm)
-                        <span class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">
-                            {{ $activeTerm->term_code }} - {{ $activeTerm->academic_year }} - {{ $activeTerm->semester }}
-                        </span>
-                    @endif
-                </div>
-
-                @php
-                    $timeSlots = [];
-                    for ($hour = 7; $hour < 19; $hour++) {
-                        $timeSlots[] = sprintf('%02d:00', $hour) . ' - ' . sprintf('%02d:00', $hour + 1);
-                    }
-
-                    $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-                    $dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-                    $timeToMinutes = function ($time) {
-                        $parts = explode(':', $time);
-                        return ((int) $parts[0] * 60) + (int) $parts[1];
-                    };
-                    $formatStandard = function ($time) {
-                        return \Carbon\Carbon::createFromFormat('H:i', $time)->format('g:i A');
-                    };
-
-                    $schedulePositions = [];
-                    foreach ($schedules as $schedule) {
-                        $day = strtolower($schedule->day);
-                        $scheduleStart = \Carbon\Carbon::parse($schedule->time_start)->format('H:i');
-                        $scheduleEnd = \Carbon\Carbon::parse($schedule->time_end)->format('H:i');
-
-                        $startMin = $timeToMinutes($scheduleStart);
-                        $endMin = $timeToMinutes($scheduleEnd);
-
-                        $startSlotIndex = null;
-                        foreach ($timeSlots as $idx => $slot) {
-                            $slotParts = explode(' - ', $slot);
-                            if ($slotParts[0] === $scheduleStart) {
-                                $startSlotIndex = $idx;
-                                break;
-                            }
-                        }
-
-                        if ($startSlotIndex !== null) {
-                            $slotCount = ($endMin - $startMin) / 60;
-                            $schedulePositions[] = [
-                                'schedule' => $schedule,
-                                'dayIndex' => array_search($day, $days),
-                                'startSlotIndex' => $startSlotIndex,
-                                'slotCount' => $slotCount,
-                            ];
-                        }
-                    }
-                @endphp
-
-                @if($schedules->isEmpty())
-                    <p class="mb-3 text-sm text-slate-500">No official schedules generated yet.</p>
-                @endif
-
-                <table class="min-w-full border-collapse">
-                    <thead>
-                        <tr>
-                            <th class="bg-blue-600 text-white font-bold px-4 py-3 text-center border-2 border-blue-700">Time</th>
-                            @foreach($dayNames as $dayName)
-                                <th class="bg-blue-600 text-white font-bold px-4 py-3 text-center border-2 border-blue-700">{{ $dayName }}</th>
-                            @endforeach
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($timeSlots as $index => $slot)
-                            <tr>
-                                @php
-                                    $slotParts = explode(' - ', $slot);
-                                    $slotLabel = $formatStandard($slotParts[0]) . ' - ' . $formatStandard($slotParts[1]);
-                                @endphp
-                                <td class="bg-gray-100 px-3 py-2 text-xs text-gray-700 font-medium border border-gray-300 text-right w-32 whitespace-nowrap">
-                                    {{ $slotLabel }}
-                                </td>
-                                @foreach($days as $dayIndex => $day)
-                                    @php
-                                        $hasSchedule = false;
-                                        $scheduleInCell = null;
-
-                                        foreach ($schedulePositions as $pos) {
-                                            if ($pos['dayIndex'] === $dayIndex && $pos['startSlotIndex'] === $index) {
-                                                $hasSchedule = true;
-                                                $scheduleInCell = $pos;
-                                                break;
-                                            }
-                                        }
-
-                                        $isCovered = false;
-                                        if (!$hasSchedule) {
-                                            foreach ($schedulePositions as $pos) {
-                                                if ($pos['dayIndex'] === $dayIndex && $index > $pos['startSlotIndex'] && $index < $pos['startSlotIndex'] + $pos['slotCount']) {
-                                                    $isCovered = true;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    @endphp
-                                    <td class="relative border border-gray-300 bg-gray-50 p-0" style="height: 60px;">
-                                        @if($hasSchedule && $scheduleInCell)
-                                            <div class="absolute inset-0 m-0.5 bg-blue-200 rounded border border-blue-400 overflow-hidden" style="height: calc({{ $scheduleInCell['slotCount'] }} * 60px - 4px); z-index: 10;">
-                                                <div class="p-1.5 text-[10px] leading-tight h-full flex flex-col justify-center">
-                                                    <div class="font-semibold text-gray-900">{{ $scheduleInCell['schedule']->subject->name }}</div>
-                                                    <div class="text-gray-700">{{ $scheduleInCell['schedule']->section->name }}</div>
-                                                    <div class="text-gray-600">{{ $scheduleInCell['schedule']->room->name }}</div>
-                                                    <div class="text-gray-600">{{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_start)->format('g:i A') }} - {{ \Carbon\Carbon::parse($scheduleInCell['schedule']->time_end)->format('g:i A') }}</div>
-                                                </div>
-                                            </div>
-                                        @elseif(!$isCovered)
-                                            <div class="absolute inset-0"></div>
-                                        @endif
-                                    </td>
-                                @endforeach
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
         </main>
     </div>
 </body>

@@ -98,6 +98,7 @@ class ScheduleController extends Controller
     public function store(Request $request)
     {
         $hasSlotCount = Schema::hasColumn('schedules', 'slot_count');
+        $hasPublishFlag = Schema::hasColumn('schedules', 'is_published');
         $validated = $request->validate([
             'teacher_id' => ['nullable', Rule::exists('users', 'id')->where(fn($q) => $q->where('role', 'teacher')->where('account_status', 'active'))],
             'subject_id' => ['required', Rule::exists('subjects', 'id')->where('status', 'active')],
@@ -111,6 +112,9 @@ class ScheduleController extends Controller
 
         if ($hasSlotCount) {
             $validated['slot_count'] = $this->computeSlotCount($validated['time_start'], $validated['time_end']);
+        }
+        if ($hasPublishFlag) {
+            $validated['is_published'] = false;
         }
 
         $relationErrors = $this->validateTimetableRelations($validated);
@@ -334,9 +338,21 @@ class ScheduleController extends Controller
         return view('admin.schedules.configure', compact('terms', 'rooms', 'selectedTermId', 'selectedRooms', 'scheduleName'));
     }
 
+    public function timetableView(Request $request)
+    {
+        $request->merge(['view_only' => true]);
+        return $this->timetable($request);
+    }
+
+    public function timetableEdit(Request $request)
+    {
+        return $this->timetable($request);
+    }
+
     public function timetable(Request $request)
     {
         $activeTerm = Term::active()->first();
+        $hasPublishFlag = Schema::hasColumn('schedules', 'is_published');
         $sessionKey = 'schedule_config';
 
         $rawTerm = $request->get('term_id') ?? $request->get('term');
@@ -345,6 +361,7 @@ class ScheduleController extends Controller
         $scheduleName = $request->get('schedule_name');
         $addRoomId = $request->get('add_room_id');
         $removeRoomId = $request->get('remove_room_id');
+        $hasScheduleName = Schema::hasColumn('schedules', 'schedule_name');
 
         if (!empty($addRoomId)) {
             $selectedRooms[] = $addRoomId;
@@ -378,6 +395,21 @@ class ScheduleController extends Controller
         // Normalize room IDs from request/session to ints to ensure consistent filtering.
         $selectedRooms = array_values(array_unique(array_filter(array_map('intval', $selectedRooms))));
 
+        $applyScheduleNameFilter = function ($query) use ($scheduleName) {
+            if ($scheduleName === null) {
+                return $query;
+            }
+            if ($scheduleName === '') {
+                return $query->where(function ($q) {
+                    $q->whereNull('schedule_name')
+                        ->orWhere('schedule_name', '');
+                });
+            }
+            return $query->where('schedule_name', $scheduleName);
+        };
+
+        $isEditable = !$request->boolean('view_only');
+
         if ($request->boolean('reset')) {
             $schedules = collect();
         } else {
@@ -390,6 +422,11 @@ class ScheduleController extends Controller
                 })
                 ->whereHas('term', fn($q) => $q->enabled())
                 ->when($termId, fn($q) => $q->where('term_id', $termId))
+                ->when($hasScheduleName && $scheduleName !== null, fn($q) => $applyScheduleNameFilter($q))
+                ->when($isEditable && $hasPublishFlag, fn($q) => $q->where(function ($sub) {
+                    $sub->where('is_published', false)
+                        ->orWhereNull('is_published');
+                }))
                 ->when(count($selectedRooms) > 0, fn($q) => $q->where(function ($roomQuery) use ($selectedRooms) {
                     $roomQuery->whereIn('room_id', $selectedRooms)
                         ->orWhereNull('room_id');
@@ -451,6 +488,7 @@ class ScheduleController extends Controller
         if (Schema::hasColumn('schedules', 'is_published') && !$request->boolean('reset')) {
             $publishedCount = Schedule::query()
                 ->when($termId, fn($q) => $q->where('term_id', $termId))
+                ->when($hasScheduleName && $scheduleName !== null, fn($q) => $applyScheduleNameFilter($q))
                 ->where('is_published', true)
                 ->count();
         }
@@ -484,7 +522,8 @@ class ScheduleController extends Controller
             'scheduleName',
             'selectedRooms',
             'term',
-            'sectionsPayload'
+            'sectionsPayload',
+            'isEditable'
         ));
     }
 
@@ -867,11 +906,21 @@ class ScheduleController extends Controller
         $affectedRows = DB::transaction(function () use ($termId, $selectedRooms, $draftSchedules, $scheduleName) {
             $query = Schedule::query()
                 ->where('term_id', $termId)
-                ->where('is_published', false);
+                ->where(function ($q) {
+                    $q->where('is_published', false)
+                        ->orWhereNull('is_published');
+                });
 
-            if (!empty($selectedRooms)) {
-                $query->whereIn('room_id', $selectedRooms);
+            if (is_null($scheduleName) || $scheduleName === '') {
+                $query->where(function ($q) {
+                    $q->whereNull('schedule_name')
+                        ->orWhere('schedule_name', '');
+                });
+            } else {
+                $query->where('schedule_name', $scheduleName);
             }
+
+            // Delete all draft rows for this term + schedule name to prevent stale blocks.
 
             $query->delete();
 

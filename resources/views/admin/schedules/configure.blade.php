@@ -7,7 +7,7 @@
 </div>
 
 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 max-w-3xl">
-    <form action="{{ route('admin.schedules.timetable') }}" method="GET" class="space-y-6">
+    <form action="{{ route('admin.schedules.timetable-edit') }}" method="GET" class="space-y-6">
         @if(request()->boolean('reset'))
             <input type="hidden" name="reset" value="1">
         @endif

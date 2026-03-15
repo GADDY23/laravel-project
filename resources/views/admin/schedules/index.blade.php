@@ -63,8 +63,8 @@
                                         @php
                                             $roomIds = $schedule->room_ids ? explode(',', $schedule->room_ids) : [];
                                         @endphp
-                                        <a href="{{ route('admin.schedules.timetable', ['term_id' => $schedule->term_id, 'schedule_name' => $schedule->schedule_name, 'rooms' => $roomIds]) }}" class="text-blue-600 hover:text-blue-800">View</a>
-                                        <a href="{{ route('admin.schedules.timetable', ['term_id' => $schedule->term_id, 'schedule_name' => $schedule->schedule_name, 'rooms' => $roomIds]) }}" class="text-amber-600 hover:text-amber-800">Edit</a>
+                                        <a href="{{ route('admin.schedules.timetable-view', ['term_id' => $schedule->term_id, 'schedule_name' => $schedule->schedule_name, 'rooms' => $roomIds]) }}" class="text-blue-600 hover:text-blue-800">View</a>
+                                        <a href="{{ route('admin.schedules.timetable-edit', ['term_id' => $schedule->term_id, 'schedule_name' => $schedule->schedule_name, 'rooms' => $roomIds]) }}" class="text-amber-600 hover:text-amber-800">Edit</a>
                                         <form action="{{ route('admin.schedules.destroy-group') }}" method="POST" onsubmit="return confirm('Delete this schedule group?')">
                                             @csrf
                                             @method('DELETE')

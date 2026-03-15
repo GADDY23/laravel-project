@@ -49,6 +49,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         
         // Schedules - Define specific routes BEFORE resource route to avoid conflicts
         Route::get('schedules/configure', [ScheduleController::class, 'configure'])->name('schedules.configure');
+        Route::get('schedules/timetable/view', [ScheduleController::class, 'timetableView'])->name('schedules.timetable-view');
+        Route::get('schedules/timetable/edit', [ScheduleController::class, 'timetableEdit'])->name('schedules.timetable-edit');
         Route::get('schedules/timetable', [ScheduleController::class, 'timetable'])->name('schedules.timetable');
         Route::post('schedules/store-from-timetable', [ScheduleController::class, 'storeFromTimetable'])->name('schedules.store-from-timetable');
         Route::post('schedules/check-conflicts', [ScheduleController::class, 'checkConflictsAjax'])->name('schedules.check-conflicts');
